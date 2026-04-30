@@ -3,12 +3,11 @@ import pandas as pd
 from google import genai
 import io
 import requests
-from bs4 import BeautifulSoup
 
 st.set_page_config(page_title="Ultimate AI Assistant", page_icon="🤖", layout="wide")
 st.title("🤖 Ultimate Personal AI Assistant")
 
-# Initialize persistent session state for memory and file uploads
+# Initialize persistent session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "uploaded_file_data" not in st.session_state:
@@ -17,11 +16,10 @@ if "uploaded_file_name" not in st.session_state:
     st.session_state.uploaded_file_name = None
 
 try:
-    # Retrieve securely stored API key
+    # Initialize the Gemini Client
     api_key = st.secrets["GEMINI_API_KEY"]
     client = genai.Client(api_key=api_key)
     
-    # Sidebar navigation for features
     st.sidebar.title("🛠️ Tools & Modules")
     module = st.sidebar.selectbox(
         "Choose an action hub:",
@@ -31,8 +29,7 @@ try:
             "Math Problem-Solving Module",
             "Math Worksheet & Quiz Generator",
             "Financial Data Analyzer",
-            "Task Execution Engine",
-            "Web Scraper Module"
+            "Task Execution Engine"
         ]
     )
 
@@ -65,10 +62,9 @@ try:
             except Exception as e:
                 st.error("Failed to generate response. Please check your API limits or connection.")
 
-    # 2. Document and Data Analyzer Module (Persistent)
+    # 2. Document and Data Analyzer Module
     elif module == "Document & Data Analyzer":
         st.subheader("Document & Data Analyzer")
-        
         uploaded_file = st.file_uploader("Upload a file (.txt or .csv)", type=["txt", "csv"])
         
         if uploaded_file is not None:
@@ -144,27 +140,41 @@ try:
 
     # 5. Financial Data Analyzer
     elif module == "Financial Data Analyzer":
-        st.subheader("Financial Data Analyzer")
-        symbol = st.text_input("Enter Ticker Symbol:", "RELIANCE.NS")
-        analysis_type = st.selectbox("Select Analysis Type:", ["Intrinsic Value Calculator", "Basic Trend Analysis", "Custom Metric Calculation"])
+        st.subheader("Live Financial Data Analyzer")
+        symbol = st.text_input("Enter Ticker Symbol (e.g., IBM or RELIANCE.NS):", "IBM")
         
-        if st.button("Analyze Financial Data"):
+        if st.button("Fetch Real-Time Data (Free API)"):
             if symbol:
-                prompt = f"Perform a {analysis_type} analysis for the ticker {symbol}. Provide data insights and calculations in a clear, structured format."
-                with st.spinner("Analyzing financial data..."):
-                    response = client.models.generate_content(
-                        model="gemini-2.5-flash",
-                        contents=prompt
-                    )
-                    st.write("### Financial Analysis Result:")
-                    st.write(response.text)
+                with st.spinner("Fetching live market metrics..."):
+                    try:
+                        # Uses the free Alpha Vantage API to get stock data
+                        url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey=demo"
+                        response = requests.get(url, timeout=5)
+                        data = response.json()
+                        
+                        if "Global Quote" in data and data["Global Quote"]:
+                            quote = data["Global Quote"]
+                            st.success(f"Market Data for {symbol}")
+                            st.metric(label="Latest Price", value=f"${float(quote['05. price']):,.2f}")
+                            st.write(f"**High:** {quote['03. high']} | **Low:** {quote['04. low']}")
+                            st.write(f"**Volume:** {quote['06. volume']}")
+                        else:
+                            st.warning("API limit reached or symbol not found using the demo key. Trying generation-based analysis instead...")
+                            # Fallback to AI-based analysis if the free key limit is reached
+                            res = client.models.generate_content(
+                                model="gemini-2.5-flash",
+                                contents=f"Provide a trend analysis summary for the financial asset {symbol}"
+                            )
+                            st.write(res.text)
+                    except Exception as e:
+                        st.error(f"Error fetching data: {e}")
 
     # 6. Task Execution Engine
     elif module == "Task Execution Engine":
         st.subheader("Task Execution Engine")
         task_type = st.selectbox(
             "Select Task Type:", 
-            ["EMI Calculator", "Dataset Statistical Engine", "Currency Converter", "Unit Converter"]
+            ["EMI Calculator", "Dataset Statistical Engine", "Currency Converter", "Weather & Metadata"]
         )
         
         if task_type == "EMI Calculator":
@@ -212,93 +222,38 @@ try:
                         st.error("Selected column is not numeric. Please select a numerical column.")
 
         elif task_type == "Currency Converter":
-            st.write("#### Currency Converter")
-            amount = st.number_input("Amount:", value=100.0)
-            from_curr = st.selectbox("From Currency:", ["USD", "EUR", "INR", "GBP"])
-            to_curr = st.selectbox("To Currency:", ["INR", "USD", "EUR", "GBP"])
+            st.write("#### Live Currency Converter (No API Key Required)")
+            amount = st.number_input("Amount to Convert:", value=100.0)
+            from_curr = st.selectbox("From Currency:", ["USD", "EUR", "INR", "GBP", "JPY"])
+            to_curr = st.selectbox("To Currency:", ["INR", "USD", "EUR", "GBP", "JPY"])
             
-            rates = {
-                "USD_INR": 83.50, "INR_USD": 1/83.50,
-                "EUR_INR": 89.50, "INR_EUR": 1/89.50,
-                "USD_EUR": 0.93, "EUR_USD": 1/0.93,
-                "GBP_INR": 104.50, "INR_GBP": 1/104.50,
-                "USD_GBP": 0.80, "GBP_USD": 1/0.80,
-                "EUR_GBP": 0.86, "GBP_EUR": 1/0.86,
-                "USD_USD": 1.0, "INR_INR": 1.0, 
-                "EUR_EUR": 1.0, "GBP_GBP": 1.0
-            }
-            
-            if st.button("Convert Currency"):
-                key = f"{from_curr}_{to_curr}"
-                if key in rates:
-                    converted = amount * rates[key]
-                    st.success(f"Converted Amount: {converted:,.2f} {to_curr}")
-                else:
-                    st.error("Conversion rate not available.")
-
-        elif task_type == "Unit Converter":
-            st.write("#### Unit Converter")
-            unit_type = st.selectbox("Select Unit Type:", ["Length", "Weight"])
-            
-            if unit_type == "Length":
-                val = st.number_input("Value:", value=1.0)
-                from_unit = st.selectbox("From Unit:", ["Meters", "Kilometers", "Centimeters", "Inches"])
-                to_unit = st.selectbox("To Unit:", ["Kilometers", "Meters", "Centimeters", "Inches"])
-                
-                to_meters = {
-                    "Meters": 1.0,
-                    "Kilometers": 1000.0,
-                    "Centimeters": 0.01,
-                    "Inches": 0.0254
-                }
-                
-                if st.button("Convert Length"):
-                    val_in_meters = val * to_meters[from_unit]
-                    res = val_in_meters / to_meters[to_unit]
-                    st.success(f"Result: {res:.4f} {to_unit}")
-                    
-            elif unit_type == "Weight":
-                val = st.number_input("Value:", value=1.0)
-                from_unit = st.selectbox("From Unit:", ["Kilograms", "Grams", "Pounds", "Ounces"])
-                to_unit = st.selectbox("To Unit:", ["Grams", "Kilograms", "Pounds", "Ounces"])
-                
-                to_kg = {
-                    "Kilograms": 1.0,
-                    "Grams": 0.001,
-                    "Pounds": 0.453592,
-                    "Ounces": 0.0283495
-                }
-                
-                if st.button("Convert Weight"):
-                    val_in_kg = val * to_kg[from_unit]
-                    res = val_in_kg / to_kg[to_unit]
-                    st.success(f"Result: {res:.4f} {to_unit}")
-
-    # 7. Web Scraper Module
-    elif module == "Web Scraper Module":
-        st.subheader("Web Scraper Module")
-        url_input = st.text_input("Enter Website URL (include https://):", "https://example.com")
-        tag_type = st.selectbox("Select HTML Tag to scrape:", ["h1", "h2", "h3", "p", "title"])
-        
-        if st.button("Scrape Website"):
-            if url_input:
+            if st.button("Convert Live Currency"):
                 try:
-                    headers = {"User-Agent": "Mozilla/5.0"}
-                    response = requests.get(url_input, headers=headers, timeout=5)
-                    
-                    if response.status_code == 200:
-                        soup = BeautifulSoup(response.content, "html.parser")
-                        elements = soup.find_all(tag_type)
-                        
-                        st.success(f"Scraped successfully from {url_input}!")
-                        st.write(f"**Found {len(elements)} {tag_type} elements:**")
-                        for idx, element in enumerate(elements[:10]):
-                            st.text(f"{idx+1}: {element.get_text(strip=True)}")
-                    else:
-                        st.error(f"Failed to load website. Status code: {response.status_code}")
+                    url = f"https://api.frankfurter.app/latest?amount={amount}&from={from_curr}&to={to_curr}"
+                    res = requests.get(url, timeout=5).json()
+                    converted_val = res['rates'][to_curr]
+                    st.success(f"Converted Amount: {converted_val:,.2f} {to_curr}")
                 except Exception as e:
-                    st.error(f"Error scraping the website: {e}")
+                    st.error("Error retrieving exchange rate. Check your internet connection.")
+
+        elif task_type == "Weather & Metadata":
+            st.write("#### Weather API & Metadata Hub")
+            city = st.text_input("Enter city name:", "Nellore")
+            
+            if st.button("Check Weather"):
+                try:
+                    # OpenWeatherMap Free API (Uses a standard key for open requests)
+                    w_url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid=439d4b804bc8187953eb36d2a8c26f02&units=metric"
+                    w_res = requests.get(w_url, timeout=5).json()
+                    if w_res['cod'] == 200:
+                        st.success(f"Weather in {city}:")
+                        st.metric(label="Temperature (°C)", value=w_res['main']['temp'])
+                        st.write(f"**Conditions:** {w_res['weather'][0]['description'].capitalize()}")
+                    else:
+                        st.error("City not found or invalid API key.")
+                except Exception as e:
+                    st.error("Failed to fetch weather data.")
 
 except Exception as e:
-    st.error("Please configure your GEMINI_API_KEY in the Streamlit cloud settings.")
-                        
+    st.error("Error in app configuration. Please configure GEMINI_API_KEY in app settings.")
+    
