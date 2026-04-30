@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from google import genai
 import io
+import requests
+from bs4 import BeautifulSoup
 
 st.set_page_config(page_title="Ultimate AI Assistant", page_icon="🤖", layout="wide")
 st.title("🤖 Ultimate Personal AI Assistant")
@@ -28,7 +30,9 @@ try:
             "Document & Data Analyzer",
             "Math Problem-Solving Module",
             "Math Worksheet & Quiz Generator",
-            "Financial Data Analyzer"
+            "Financial Data Analyzer",
+            "Task Execution Engine",
+            "Web Scraper Module"
         ]
     )
 
@@ -154,7 +158,147 @@ try:
                     )
                     st.write("### Financial Analysis Result:")
                     st.write(response.text)
+
+    # 6. Task Execution Engine
+    elif module == "Task Execution Engine":
+        st.subheader("Task Execution Engine")
+        task_type = st.selectbox(
+            "Select Task Type:", 
+            ["EMI Calculator", "Dataset Statistical Engine", "Currency Converter", "Unit Converter"]
+        )
+        
+        if task_type == "EMI Calculator":
+            st.write("#### Calculate Loan EMIs")
+            p = st.number_input("Principal Amount (Rs/$):", value=50000.0)
+            r = st.number_input("Annual Interest Rate (%):", value=8.5)
+            t = st.number_input("Tenure (Years):", value=5)
+            
+            if st.button("Run Calculation"):
+                r_month = r / (12 * 100)
+                months = t * 12
+                if r_month > 0:
+                    emi = (p * r_month * (1 + r_month)**months) / ((1 + r_month)**months - 1)
+                    total_amount = emi * months
+                    total_interest = total_amount - p
+                    st.success("Calculation Successful!")
+                    st.metric(label="Calculated Monthly EMI", value=f"{emi:,.2f}")
+                    st.write(f"**Total Interest Payable:** {total_interest:,.2f}")
+                    st.write(f"**Total Amount Payable:** {total_amount:,.2f}")
+                else:
+                    st.error("Interest rate must be greater than zero.")
                     
+        elif task_type == "Dataset Statistical Engine":
+            st.write("#### CSV File Statistics & Processing")
+            uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
+            if uploaded_file:
+                df = pd.read_csv(uploaded_file)
+                st.write("Dataset Sample:", df.head())
+                
+                col_to_analyze = st.selectbox("Select column to analyze:", df.columns)
+                if st.button("Compute Statistics"):
+                    if pd.api.types.is_numeric_dtype(df[col_to_analyze]):
+                        st.write("#### Statistics for:", col_to_analyze)
+                        stats = df[col_to_analyze].describe()
+                        st.dataframe(stats)
+                        
+                        csv_data = df.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label="Download Processed CSV",
+                            data=csv_data,
+                            file_name='processed_dataset.csv',
+                            mime='text/csv'
+                        )
+                    else:
+                        st.error("Selected column is not numeric. Please select a numerical column.")
+
+        elif task_type == "Currency Converter":
+            st.write("#### Currency Converter")
+            amount = st.number_input("Amount:", value=100.0)
+            from_curr = st.selectbox("From Currency:", ["USD", "EUR", "INR", "GBP"])
+            to_curr = st.selectbox("To Currency:", ["INR", "USD", "EUR", "GBP"])
+            
+            rates = {
+                "USD_INR": 83.50, "INR_USD": 1/83.50,
+                "EUR_INR": 89.50, "INR_EUR": 1/89.50,
+                "USD_EUR": 0.93, "EUR_USD": 1/0.93,
+                "GBP_INR": 104.50, "INR_GBP": 1/104.50,
+                "USD_GBP": 0.80, "GBP_USD": 1/0.80,
+                "EUR_GBP": 0.86, "GBP_EUR": 1/0.86,
+                "USD_USD": 1.0, "INR_INR": 1.0, 
+                "EUR_EUR": 1.0, "GBP_GBP": 1.0
+            }
+            
+            if st.button("Convert Currency"):
+                key = f"{from_curr}_{to_curr}"
+                if key in rates:
+                    converted = amount * rates[key]
+                    st.success(f"Converted Amount: {converted:,.2f} {to_curr}")
+                else:
+                    st.error("Conversion rate not available.")
+
+        elif task_type == "Unit Converter":
+            st.write("#### Unit Converter")
+            unit_type = st.selectbox("Select Unit Type:", ["Length", "Weight"])
+            
+            if unit_type == "Length":
+                val = st.number_input("Value:", value=1.0)
+                from_unit = st.selectbox("From Unit:", ["Meters", "Kilometers", "Centimeters", "Inches"])
+                to_unit = st.selectbox("To Unit:", ["Kilometers", "Meters", "Centimeters", "Inches"])
+                
+                to_meters = {
+                    "Meters": 1.0,
+                    "Kilometers": 1000.0,
+                    "Centimeters": 0.01,
+                    "Inches": 0.0254
+                }
+                
+                if st.button("Convert Length"):
+                    val_in_meters = val * to_meters[from_unit]
+                    res = val_in_meters / to_meters[to_unit]
+                    st.success(f"Result: {res:.4f} {to_unit}")
+                    
+            elif unit_type == "Weight":
+                val = st.number_input("Value:", value=1.0)
+                from_unit = st.selectbox("From Unit:", ["Kilograms", "Grams", "Pounds", "Ounces"])
+                to_unit = st.selectbox("To Unit:", ["Grams", "Kilograms", "Pounds", "Ounces"])
+                
+                to_kg = {
+                    "Kilograms": 1.0,
+                    "Grams": 0.001,
+                    "Pounds": 0.453592,
+                    "Ounces": 0.0283495
+                }
+                
+                if st.button("Convert Weight"):
+                    val_in_kg = val * to_kg[from_unit]
+                    res = val_in_kg / to_kg[to_unit]
+                    st.success(f"Result: {res:.4f} {to_unit}")
+
+    # 7. Web Scraper Module
+    elif module == "Web Scraper Module":
+        st.subheader("Web Scraper Module")
+        url_input = st.text_input("Enter Website URL (include https://):", "https://example.com")
+        tag_type = st.selectbox("Select HTML Tag to scrape:", ["h1", "h2", "h3", "p", "title"])
+        
+        if st.button("Scrape Website"):
+            if url_input:
+                try:
+                    headers = {"User-Agent": "Mozilla/5.0"}
+                    response = requests.get(url_input, headers=headers, timeout=5)
+                    
+                    if response.status_code == 200:
+                        soup = BeautifulSoup(response.content, "html.parser")
+                        elements = soup.find_all(tag_type)
+                        
+                        st.success(f"Scraped successfully from {url_input}!")
+                        st.write(f"**Found {len(elements)} {tag_type} elements:**")
+                        for idx, element in enumerate(elements[:10]):
+                            st.text(f"{idx+1}: {element.get_text(strip=True)}")
+                    else:
+                        st.error(f"Failed to load website. Status code: {response.status_code}")
+                except Exception as e:
+                    st.error(f"Error scraping the website: {e}")
+
 except Exception as e:
     st.error("Please configure your GEMINI_API_KEY in the Streamlit cloud settings.")
-        
+                        
