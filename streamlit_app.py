@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from google import genai
+from google.genai import types
 from PIL import Image
 import io
 
@@ -113,20 +114,31 @@ try:
             if img_prompt:
                 with st.spinner("Creating your image..."):
                     try:
-                        # Generating an image with the Imagen model
-                        result = client.models.generate_images(
-                            model='imagen-3.0-generate-002',
-                            prompt=img_prompt,
-                            config=dict(
-                                number_of_images=1,
-                                aspect_ratio="1:1"
+                        # Use Gemini 2.5 Flash Image endpoint
+                        response = client.models.generate_content(
+                            model="gemini-2.5-flash-image",
+                            contents=img_prompt,
+                            config=types.GenerateContentConfig(
+                                response_modalities=["IMAGE"],
+                                image_config=types.ImageConfig(
+                                    aspect_ratio="1:1"
+                                )
                             )
                         )
-                        for generated_image in result.generated_images:
-                            image = Image.open(io.BytesIO(generated_image.image.image_bytes))
-                            st.image(image, caption=img_prompt)
+                        
+                        found_image = False
+                        for part in response.parts:
+                            if part.inline_data:
+                                image = part.as_image()
+                                st.image(image, caption=img_prompt)
+                                found_image = True
+                                
+                        if not found_image:
+                            st.warning("No image was generated. Please adjust the prompt or check your safety settings.")
+                            
                     except Exception as e:
-                        st.error("Please ensure you are on an appropriate tier for image generation or check API configuration.")
+                        st.error(f"Error generating image: {e}")
                 
 except Exception as e:
     st.error("Please configure your GEMINI_API_KEY in the Streamlit cloud settings.")
+                    
