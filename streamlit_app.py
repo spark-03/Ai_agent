@@ -1,16 +1,18 @@
 import streamlit as st
 import pandas as pd
 from google import genai
-from google.genai import types
-from PIL import Image
 import io
 
 st.set_page_config(page_title="Ultimate AI Assistant", page_icon="🤖", layout="wide")
 st.title("🤖 Ultimate Personal AI Assistant")
 
-# Initialize persistent chat memory
+# Initialize persistent session state for memory and file uploads
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "uploaded_file_data" not in st.session_state:
+    st.session_state.uploaded_file_data = None
+if "uploaded_file_name" not in st.session_state:
+    st.session_state.uploaded_file_name = None
 
 try:
     # Retrieve securely stored API key
@@ -21,7 +23,13 @@ try:
     st.sidebar.title("🛠️ Tools & Modules")
     module = st.sidebar.selectbox(
         "Choose an action hub:",
-        ["Chat Assistant", "Document & Data Analyzer", "Math Problem-Solving Module", "Image Generation"]
+        [
+            "Chat Assistant",
+            "Document & Data Analyzer",
+            "Math Problem-Solving Module",
+            "Math Worksheet & Quiz Generator",
+            "Financial Data Analyzer"
+        ]
     )
 
     # 1. Chat Assistant Module
@@ -53,14 +61,21 @@ try:
             except Exception as e:
                 st.error("Failed to generate response. Please check your API limits or connection.")
 
-    # 2. Document and Data Analyzer Module
+    # 2. Document and Data Analyzer Module (Persistent)
     elif module == "Document & Data Analyzer":
         st.subheader("Document & Data Analyzer")
+        
         uploaded_file = st.file_uploader("Upload a file (.txt or .csv)", type=["txt", "csv"])
         
         if uploaded_file is not None:
-            if uploaded_file.name.endswith(".txt"):
-                file_content = uploaded_file.read().decode("utf-8")
+            st.session_state.uploaded_file_data = uploaded_file.read()
+            st.session_state.uploaded_file_name = uploaded_file.name
+        elif st.session_state.uploaded_file_data is not None:
+            st.info(f"Using previously uploaded file: {st.session_state.uploaded_file_name}")
+            
+        if st.session_state.uploaded_file_data is not None:
+            if st.session_state.uploaded_file_name.endswith(".txt"):
+                file_content = st.session_state.uploaded_file_data.decode("utf-8")
                 st.text_area("File Content:", file_content, height=100)
                 
                 prompt = st.text_input("Ask a question about the text:")
@@ -72,8 +87,8 @@ try:
                     st.write("### Analysis Result:")
                     st.write(response.text)
                     
-            elif uploaded_file.name.endswith(".csv"):
-                df = pd.read_csv(uploaded_file)
+            elif st.session_state.uploaded_file_name.endswith(".csv"):
+                df = pd.read_csv(io.BytesIO(st.session_state.uploaded_file_data))
                 st.dataframe(df.head(10))
                 
                 prompt = st.text_input("Ask about this dataset:")
@@ -105,40 +120,41 @@ try:
                 st.write("### Solution:")
                 st.write(response.text)
 
-    # 4. Image Generation Module
-    elif module == "Image Generation":
-        st.subheader("Image Generation Module")
-        img_prompt = st.text_input("Describe the image you'd like to create:")
+    # 4. Math Worksheet & Quiz Generator
+    elif module == "Math Worksheet & Quiz Generator":
+        st.subheader("Math Worksheet & Quiz Generator")
+        topic = st.text_input("Topic/Concept (e.g., Quadratic Equations, Arithmetic Progressions):")
+        difficulty = st.selectbox("Select Difficulty:", ["Easy", "Medium", "Hard"])
+        num_questions = st.slider("Number of questions to generate:", min_value=3, max_value=10, value=5)
         
-        if st.button("Generate Image"):
-            if img_prompt:
-                with st.spinner("Creating your image..."):
-                    try:
-                        # Use Gemini 2.5 Flash Image endpoint
-                        response = client.models.generate_content(
-                            model="gemini-2.5-flash-image",
-                            contents=img_prompt,
-                            config=types.GenerateContentConfig(
-                                response_modalities=["IMAGE"],
-                                image_config=types.ImageConfig(
-                                    aspect_ratio="1:1"
-                                )
-                            )
-                        )
-                        
-                        found_image = False
-                        for part in response.parts:
-                            if part.inline_data:
-                                image = part.as_image()
-                                st.image(image, caption=img_prompt)
-                                found_image = True
-                                
-                        if not found_image:
-                            st.warning("No image was generated. Please adjust the prompt or check your safety settings.")
-                            
-                    except Exception as e:
-                        st.error(f"Error generating image: {e}")
-                
+        if st.button("Generate Worksheet"):
+            if topic:
+                prompt = f"Generate {num_questions} math problems on the topic '{topic}' with a '{difficulty}' difficulty level. Provide the complete answer key separately at the bottom."
+                with st.spinner("Generating worksheet..."):
+                    response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=prompt
+                    )
+                    st.write("### Generated Worksheet:")
+                    st.write(response.text)
+
+    # 5. Financial Data Analyzer
+    elif module == "Financial Data Analyzer":
+        st.subheader("Financial Data Analyzer")
+        symbol = st.text_input("Enter Ticker Symbol:", "RELIANCE.NS")
+        analysis_type = st.selectbox("Select Analysis Type:", ["Intrinsic Value Calculator", "Basic Trend Analysis", "Custom Metric Calculation"])
+        
+        if st.button("Analyze Financial Data"):
+            if symbol:
+                prompt = f"Perform a {analysis_type} analysis for the ticker {symbol}. Provide data insights and calculations in a clear, structured format."
+                with st.spinner("Analyzing financial data..."):
+                    response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=prompt
+                    )
+                    st.write("### Financial Analysis Result:")
+                    st.write(response.text)
+                    
 except Exception as e:
     st.error("Please configure your GEMINI_API_KEY in the Streamlit cloud settings.")
-                    
+        
