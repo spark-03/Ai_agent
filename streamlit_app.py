@@ -269,9 +269,9 @@ def send_whatsapp_reminder(to_number, task_description):
         
         client = Client(account_sid, auth_token)
         
-        # Send a WhatsApp message from the Twilio sandbox number
+        # Use the global Twilio Sandbox Number
         message = client.messages.create(
-            from_='whatsapp:+14155238886', # Twilio Sandbox Number
+            from_='whatsapp:+14155238886', # The sender must always be this sandbox number
             body=f"🤖 AI Assistant Reminder: {task_description}",
             to=f'whatsapp:{to_number}'
         )
@@ -282,7 +282,6 @@ def send_whatsapp_reminder(to_number, task_description):
 st.subheader("🤖 Task Execution & Notifications")
 
 task_name = st.text_input("Task / Reminder Name:")
-# Instructing use of international format to prevent errors
 phone_number = st.text_input("Your WhatsApp Number (Include country code, e.g., +919876543210):")
 
 if st.button("Send Reminder to WhatsApp"):
@@ -296,4 +295,3 @@ if st.button("Send Reminder to WhatsApp"):
                 st.success(f"Notification sent successfully! (Reference ID: {result})")
     else:
         st.warning("Please enter both a task name and a WhatsApp number.")
-        
