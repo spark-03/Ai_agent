@@ -3,6 +3,8 @@ import pandas as pd
 from google import genai
 import io
 import requests
+import google.generativeai as genai
+
 
 st.set_page_config(page_title="Ultimate AI Assistant", page_icon="🤖", layout="wide")
 st.title("🤖 Ultimate Personal AI Assistant")
