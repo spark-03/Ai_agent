@@ -257,3 +257,43 @@ try:
 except Exception as e:
     st.error("Error in app configuration. Please configure GEMINI_API_KEY in app settings.")
     
+import streamlit as st
+from twilio.rest import Client
+
+def send_whatsapp_reminder(to_number, task_description):
+    """Sends a WhatsApp message using the Twilio API."""
+    try:
+        # Load secrets from Streamlit
+        account_sid = st.secrets["TWILIO_ACCOUNT_SID"]
+        auth_token = st.secrets["TWILIO_AUTH_TOKEN"]
+        
+        client = Client(account_sid, auth_token)
+        
+        # Send a WhatsApp message from the Twilio sandbox number
+        message = client.messages.create(
+            from_='whatsapp:+14155238886', # Twilio Sandbox Number
+            body=f"🤖 AI Assistant Reminder: {task_description}",
+            to=f'whatsapp:{to_number}'
+        )
+        return message.sid
+    except Exception as e:
+        return f"Error: {e}"
+
+st.subheader("🤖 Task Execution & Notifications")
+
+task_name = st.text_input("Task / Reminder Name:")
+# Instructing use of international format to prevent errors
+phone_number = st.text_input("Your WhatsApp Number (Include country code, e.g., +919876543210):")
+
+if st.button("Send Reminder to WhatsApp"):
+    if task_name and phone_number:
+        with st.spinner("Sending message..."):
+            result = send_whatsapp_reminder(phone_number, task_name)
+            
+            if "Error" in result:
+                st.error(f"Failed to send message: {result}")
+            else:
+                st.success(f"Notification sent successfully! (Reference ID: {result})")
+    else:
+        st.warning("Please enter both a task name and a WhatsApp number.")
+        
