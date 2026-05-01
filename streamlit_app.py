@@ -60,9 +60,35 @@ try:
                     contents="\n".join(contents)
                 )
                 
-                st.session_state.messages.append({"role": "assistant", "content": response.text})
+                ans_text = response.text
+                st.session_state.messages.append({"role": "assistant", "content": ans_text})
                 with st.chat_message("assistant"):
-                    st.write(response.text)
+                    st.write(ans_text)
+                
+                # Context-Aware WhatsApp Trigger in Chat Assistant
+                task_lower = user_input.lower()
+                if any(word in task_lower for word in ["whatsapp", "send", "ans", "reminder"]):
+                    with st.spinner("Sending answer to WhatsApp..."):
+                        try:
+                            # Fetch credentials directly from Streamlit secrets
+                            phone_number = st.secrets["MY_PHONE_NUMBER"]
+                            account_sid = st.secrets["TWILIO_ACCOUNT_SID"]
+                            auth_token = st.secrets["TWILIO_AUTH_TOKEN"]
+                            
+                            tw_client = Client(account_sid, auth_token)
+                            message_body = f"🤖 AI Agent Task Result\n\nTask: {user_input}\nAnswer: {ans_text}"
+                            
+                            tw_client.messages.create(
+                                from_='whatsapp:+14155238886', # Twilio Sandbox Number
+                                body=message_body,
+                                to=f'whatsapp:{phone_number}'
+                            )
+                            st.success("Sent to your WhatsApp automatically based on your instruction!")
+                        except KeyError:
+                            st.error("Configuration Error: Please make sure MY_PHONE_NUMBER, TWILIO_ACCOUNT_SID, and TWILIO_AUTH_TOKEN are set in your secrets.")
+                        except Exception as e:
+                            st.error(f"Failed to send message: {e}")
+                            
             except Exception as e:
                 st.error("Failed to generate response. Please check your API limits or connection.")
 
@@ -151,7 +177,6 @@ try:
             if symbol:
                 with st.spinner("Fetching live market metrics..."):
                     try:
-                        # Uses the free Alpha Vantage API to get stock data
                         url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey=demo"
                         response = requests.get(url, timeout=5)
                         data = response.json()
@@ -267,7 +292,6 @@ try:
                 with st.spinner("Processing task..."):
                     task_lower = task_input.lower()
                     
-                    # Math operation evaluator
                     if "add" in task_lower or "+" in task_lower:
                         numbers = [float(s) for s in re.findall(r'-?\d+\.?\d*', task_input)]
                         if numbers:
@@ -282,7 +306,6 @@ try:
                             except Exception as e:
                                 answer = f"Error: {e}"
                     else:
-                        # Process using Gemini
                         try:
                             response = client.models.generate_content(
                                 model="gemini-2.5-flash",
@@ -294,7 +317,6 @@ try:
                             
                     st.info(f"**Answer:** {answer}")
                     
-                    # Context-Aware WhatsApp Trigger
                     if any(word in task_lower for word in ["whatsapp", "send", "ans", "reminder"]):
                         try:
                             phone_number = st.secrets["MY_PHONE_NUMBER"]
@@ -317,4 +339,4 @@ try:
 
 except Exception as e:
     st.error(f"Error in app configuration. Please configure GEMINI_API_KEY in app settings. Details: {e}")
-                    
+                
