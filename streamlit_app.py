@@ -258,40 +258,75 @@ except Exception as e:
     st.error("Error in app configuration. Please configure GEMINI_API_KEY in app settings.")
     
 import streamlit as st
+import re
 from twilio.rest import Client
+import google.generativeai as genai
 
-def send_whatsapp_reminder(to_number, task_description):
-    """Sends a WhatsApp message using the Twilio API."""
+st.set_page_config(layout="wide")
+st.title("🤖 Context-Aware AI WhatsApp Agent")
+
+# --- 1. Processing Functions ---
+def process_task(task_text):
+    """Processes math operations and general questions."""
+    text_lower = task_text.lower()
+    
+    if "add" in text_lower or "+" in text_lower:
+        numbers = [float(s) for s in re.findall(r'-?\d+\.?\d*', task_text)]
+        if numbers:
+            return f"The sum of {', '.join(map(str, numbers))} is {sum(numbers)}"
+            
     try:
-        # Load secrets from Streamlit
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        response = model.generate_content(task_text)
+        return response.text
+    except Exception as e:
+        return f"Error evaluating task: {str(e)}"
+
+def send_whatsapp_message(to_number, task_description, answer):
+    """Sends the processed answer to WhatsApp using Twilio Sandbox."""
+    try:
         account_sid = st.secrets["TWILIO_ACCOUNT_SID"]
         auth_token = st.secrets["TWILIO_AUTH_TOKEN"]
         
         client = Client(account_sid, auth_token)
+        message_body = f"🤖 AI Agent Task Result\n\nTask: {task_description}\nAnswer: {answer}"
         
-        # Use the global Twilio Sandbox Number
         message = client.messages.create(
-            from_='whatsapp:+14155238886', # The sender must always be this sandbox number
-            body=f"🤖 AI Assistant Reminder: {task_description}",
+            from_='whatsapp:+14155238886', # Twilio Sandbox Number
+            body=message_body,
             to=f'whatsapp:{to_number}'
         )
         return message.sid
     except Exception as e:
         return f"Error: {e}"
 
-st.subheader("🤖 Task Execution & Notifications")
+# --- 2. Main Processing Flow ---
+user_input = st.text_input("Enter your task or command (e.g., 'Add 5 and 89 and send ans to my whatsapp'):")
 
-task_name = st.text_input("Task / Reminder Name:")
-phone_number = st.text_input("Your WhatsApp Number (Include country code, e.g., +919876543210):")
-
-if st.button("Send Reminder to WhatsApp"):
-    if task_name and phone_number:
-        with st.spinner("Sending message..."):
-            result = send_whatsapp_reminder(phone_number, task_name)
+if st.button("Execute"):
+    if user_input:
+        with st.spinner("Processing task..."):
+            answer = process_task(user_input)
+            st.info(f"**Answer:** {answer}")
             
-            if "Error" in result:
-                st.error(f"Failed to send message: {result}")
-            else:
-                st.success(f"Notification sent successfully! (Reference ID: {result})")
-    else:
-        st.warning("Please enter both a task name and a WhatsApp number.")
+            # Context-Aware Trigger
+            lower_input = user_input.lower()
+            if any(word in lower_input for word in ["whatsapp", "send", "ans", "reminder"]):
+                try:
+                    # Fetch phone number directly from secrets
+                    phone_number = st.secrets["MY_PHONE_NUMBER"]
+                    
+                    result = send_whatsapp_message(
+                        phone_number, 
+                        user_input, 
+                        answer
+                    )
+                    
+                    if "Error" in str(result):
+                        st.error(f"Failed to send message: {result}")
+                    else:
+                        st.success("Sent to your WhatsApp automatically based on your instruction!")
+                except KeyError:
+                    st.error("Configuration Error: Please make sure MY_PHONE_NUMBER is set in your Streamlit Secrets.")
+
+                                                                   
