@@ -38,45 +38,23 @@ try:
     )
 
     # 1. Chat Assistant Module
-    if module == "Chat Assistant":
-        st.subheader("Chat Assistant")
-        for msg in st.session_state.messages:
-            with st.chat_message(msg["role"]):
-                st.write(msg["content"])
-                
-        if user_input := st.chat_input("Ask a question..."):
-            st.session_state.messages.append({"role": "user", "content": user_input})
-            with st.chat_message("user"):
-                st.write(user_input)
-                
-            try:
-                contents = []
-                for m in st.session_state.messages:
-                    role_prefix = "You" if m["role"] == "user" else "Agent"
-                    contents.append(f"{role_prefix}: {m['content']}")
-                    
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents="\n".join(contents)
-                )
-                
-                ans_text = response.text
-                st.session_state.messages.append({"role": "assistant", "content": ans_text})
-                with st.chat_message("assistant"):
-                    st.write(ans_text)
-                
-                # Context-Aware WhatsApp Trigger in Chat Assistant
+                    # Context-Aware WhatsApp Trigger in Chat Assistant
                 task_lower = user_input.lower()
                 if any(word in task_lower for word in ["whatsapp", "send", "ans", "reminder"]):
                     with st.spinner("Sending answer to WhatsApp..."):
                         try:
-                            # Fetch credentials directly from Streamlit secrets
                             phone_number = st.secrets["MY_PHONE_NUMBER"]
                             account_sid = st.secrets["TWILIO_ACCOUNT_SID"]
                             auth_token = st.secrets["TWILIO_AUTH_TOKEN"]
                             
                             tw_client = Client(account_sid, auth_token)
-                            message_body = f"🤖 AI Agent Task Result\n\nTask: {user_input}\nAnswer: {ans_text}"
+                            
+                            # Extract clean message if it's a simple send command
+                            if "send" in task_lower and "whatsapp" in task_lower:
+                                clean_msg = task_lower.replace("nothing", "").replace("can you", "").replace("send", "").replace("to my whatsapp", "").replace("number", "").strip()
+                                message_body = clean_msg if clean_msg else ans_text
+                            else:
+                                message_body = f"🤖 AI Agent Task Result\n\nTask: {user_input}\nAnswer: {ans_text}"
                             
                             tw_client.messages.create(
                                 from_='whatsapp:+14155238886', # Twilio Sandbox Number
@@ -88,9 +66,6 @@ try:
                             st.error("Configuration Error: Please make sure MY_PHONE_NUMBER, TWILIO_ACCOUNT_SID, and TWILIO_AUTH_TOKEN are set in your secrets.")
                         except Exception as e:
                             st.error(f"Failed to send message: {e}")
-                            
-            except Exception as e:
-                st.error("Failed to generate response. Please check your API limits or connection.")
 
     # 2. Document and Data Analyzer Module
     elif module == "Document & Data Analyzer":
@@ -281,7 +256,8 @@ try:
                 except Exception as e:
                     st.error("Failed to fetch weather data.")
 
-    # 7. WhatsApp AI Task Agent Module
+
+        # 7. WhatsApp AI Task Agent Module
     elif module == "WhatsApp AI Task Agent":
         st.subheader("🤖 Context-Aware AI WhatsApp Agent")
         
@@ -324,19 +300,21 @@ try:
                             auth_token = st.secrets["TWILIO_AUTH_TOKEN"]
                             
                             tw_client = Client(account_sid, auth_token)
-                            message_body = f"🤖 AI Agent Task Result\n\nTask: {task_input}\nAnswer: {answer}"
+                            
+                            # Extract clean message if it is a simple "send ... to whatsapp"
+                            if "send" in task_lower and "to my whatsapp" in task_lower:
+                                clean_msg = task_lower.replace("nothing", "").replace("can you", "").replace("send", "").replace("to my whatsapp", "").replace("number", "").strip()
+                                message_body = clean_msg if clean_msg else answer
+                            else:
+                                message_body = f"🤖 AI Agent Task Result\n\nTask: {task_input}\nAnswer: {answer}"
                             
                             tw_client.messages.create(
                                 from_='whatsapp:+14155238886', # Twilio Sandbox Number
                                 body=message_body,
                                 to=f'whatsapp:{phone_number}'
                             )
-                            st.success("Sent to your WhatsApp automatically based on your instruction!")
+                            st.success(f"Sent the message '{message_body}' to your WhatsApp!")
                         except KeyError:
                             st.error("Configuration Error: Please make sure MY_PHONE_NUMBER, TWILIO_ACCOUNT_SID, and TWILIO_AUTH_TOKEN are set in secrets.")
                         except Exception as e:
                             st.error(f"Failed to send message: {e}")
-
-except Exception as e:
-    st.error(f"Error in app configuration. Please configure GEMINI_API_KEY in app settings. Details: {e}")
-                
