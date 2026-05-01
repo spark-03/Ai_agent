@@ -349,4 +349,42 @@ try:
 
 except Exception as e:
     st.error(f"Error in app configuration. Please configure GEMINI_API_KEY in app settings. Details: {e}")
-                            
+
+import streamlit as st
+import requests
+from streamlit_geolocation import streamlit_geolocation
+
+def main():
+    st.set_page_config(page_title="AI Location & Weather Dashboard", layout="centered")
+    
+    st.write("#### Weather & Location Hub")
+    
+    # Render the geolocation widget/button
+    loc = streamlit_geolocation()
+
+    if st.button("Fetch Current Location"):
+        # Access the location data
+        lat = loc.get("latitude")
+        lon = loc.get("longitude")
+        
+        if lat is not None and lon is not None:
+            st.success(f"Location found! Coordinates: {lat:.4f}, {lon:.4f}")
+            
+            # Fetch weather using coordinates instead of city name
+            try:
+                w_url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid=439d4b804bc8187953eb36d2a8c26f02&units=metric"
+                w_res = requests.get(w_url, timeout=5).json()
+                
+                if w_res.get('cod') == 200:
+                    st.metric(label="Temperature (°C)", value=w_res['main']['temp'])
+                    st.write(f"**Conditions:** {w_res['weather'][0]['description'].capitalize()}")
+                else:
+                    st.error("Unable to fetch weather data for your location.")
+            except Exception as e:
+                st.error("Failed to connect to the weather service.")
+        else:
+            st.warning("Please enable location permissions in your browser and try again.")
+
+if __name__ == "__main__":
+    main()
+    
