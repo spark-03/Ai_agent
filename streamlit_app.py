@@ -1,11 +1,12 @@
 import streamlit as st
 import pandas as pd
-from google import genai
 import io
 import requests
-import google.generativeai as genai
+import re
+from twilio.rest import Client
+from google import genai
 
-
+# Page Configuration
 st.set_page_config(page_title="Ultimate AI Assistant", page_icon="🤖", layout="wide")
 st.title("🤖 Ultimate Personal AI Assistant")
 
@@ -18,7 +19,7 @@ if "uploaded_file_name" not in st.session_state:
     st.session_state.uploaded_file_name = None
 
 try:
-    # Initialize the Gemini Client
+    # Initialize the Gemini Client using the new google-genai SDK
     api_key = st.secrets["GEMINI_API_KEY"]
     client = genai.Client(api_key=api_key)
     
@@ -31,7 +32,8 @@ try:
             "Math Problem-Solving Module",
             "Math Worksheet & Quiz Generator",
             "Financial Data Analyzer",
-            "Task Execution Engine"
+            "Task Execution Engine",
+            "WhatsApp AI Task Agent"
         ]
     )
 
@@ -161,8 +163,7 @@ try:
                             st.write(f"**High:** {quote['03. high']} | **Low:** {quote['04. low']}")
                             st.write(f"**Volume:** {quote['06. volume']}")
                         else:
-                            st.warning("API limit reached or symbol not found using the demo key. Trying generation-based analysis instead...")
-                            # Fallback to AI-based analysis if the free key limit is reached
+                            st.warning("API limit reached or symbol not found. Trying generation-based analysis instead...")
                             res = client.models.generate_content(
                                 model="gemini-2.5-flash",
                                 contents=f"Provide a trend analysis summary for the financial asset {symbol}"
@@ -224,7 +225,7 @@ try:
                         st.error("Selected column is not numeric. Please select a numerical column.")
 
         elif task_type == "Currency Converter":
-            st.write("#### Live Currency Converter (No API Key Required)")
+            st.write("#### Live Currency Converter")
             amount = st.number_input("Amount to Convert:", value=100.0)
             from_curr = st.selectbox("From Currency:", ["USD", "EUR", "INR", "GBP", "JPY"])
             to_curr = st.selectbox("To Currency:", ["INR", "USD", "EUR", "GBP", "JPY"])
@@ -244,7 +245,6 @@ try:
             
             if st.button("Check Weather"):
                 try:
-                    # OpenWeatherMap Free API (Uses a standard key for open requests)
                     w_url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid=439d4b804bc8187953eb36d2a8c26f02&units=metric"
                     w_res = requests.get(w_url, timeout=5).json()
                     if w_res['cod'] == 200:
@@ -256,79 +256,65 @@ try:
                 except Exception as e:
                     st.error("Failed to fetch weather data.")
 
-except Exception as e:
-    st.error("Error in app configuration. Please configure GEMINI_API_KEY in app settings.")
-    
-import streamlit as st
-import re
-from twilio.rest import Client
-import google.generativeai as genai
-
-st.set_page_config(layout="wide")
-st.title("🤖 Context-Aware AI WhatsApp Agent")
-
-# --- 1. Processing Functions ---
-def process_task(task_text):
-    """Processes math operations and general questions."""
-    text_lower = task_text.lower()
-    
-    if "add" in text_lower or "+" in text_lower:
-        numbers = [float(s) for s in re.findall(r'-?\d+\.?\d*', task_text)]
-        if numbers:
-            return f"The sum of {', '.join(map(str, numbers))} is {sum(numbers)}"
-            
-    try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        response = model.generate_content(task_text)
-        return response.text
-    except Exception as e:
-        return f"Error evaluating task: {str(e)}"
-
-def send_whatsapp_message(to_number, task_description, answer):
-    """Sends the processed answer to WhatsApp using Twilio Sandbox."""
-    try:
-        account_sid = st.secrets["TWILIO_ACCOUNT_SID"]
-        auth_token = st.secrets["TWILIO_AUTH_TOKEN"]
+    # 7. WhatsApp AI Task Agent Module
+    elif module == "WhatsApp AI Task Agent":
+        st.subheader("🤖 Context-Aware AI WhatsApp Agent")
         
-        client = Client(account_sid, auth_token)
-        message_body = f"🤖 AI Agent Task Result\n\nTask: {task_description}\nAnswer: {answer}"
+        task_input = st.text_input("Enter your task or command (e.g., 'Add 5 and 89 and send ans to my whatsapp'):")
         
-        message = client.messages.create(
-            from_='whatsapp:+14155238886', # Twilio Sandbox Number
-            body=message_body,
-            to=f'whatsapp:{to_number}'
-        )
-        return message.sid
-    except Exception as e:
-        return f"Error: {e}"
-
-# --- 2. Main Processing Flow ---
-user_input = st.text_input("Enter your task or command (e.g., 'Add 5 and 89 and send ans to my whatsapp'):")
-
-if st.button("Execute"):
-    if user_input:
-        with st.spinner("Processing task..."):
-            answer = process_task(user_input)
-            st.info(f"**Answer:** {answer}")
-            
-            # Context-Aware Trigger
-            lower_input = user_input.lower()
-            if any(word in lower_input for word in ["whatsapp", "send", "ans", "reminder"]):
-                try:
-                    # Fetch phone number directly from secrets
-                    phone_number = st.secrets["MY_PHONE_NUMBER"]
+        if st.button("Execute"):
+            if task_input:
+                with st.spinner("Processing task..."):
+                    task_lower = task_input.lower()
                     
-                    result = send_whatsapp_message(
-                        phone_number, 
-                        user_input, 
-                        answer
-                    )
-                    
-                    if "Error" in str(result):
-                        st.error(f"Failed to send message: {result}")
+                    # Math operation evaluator
+                    if "add" in task_lower or "+" in task_lower:
+                        numbers = [float(s) for s in re.findall(r'-?\d+\.?\d*', task_input)]
+                        if numbers:
+                            answer = f"The sum of {', '.join(map(str, numbers))} is {sum(numbers)}"
+                        else:
+                            try:
+                                response = client.models.generate_content(
+                                    model="gemini-2.5-flash",
+                                    contents=task_input
+                                )
+                                answer = response.text
+                            except Exception as e:
+                                answer = f"Error: {e}"
                     else:
-                        st.success("Sent to your WhatsApp automatically based on your instruction!")
-                except KeyError:
-                    st.error("Configuration Error: Please make sure MY_PHONE_NUMBER is set in your Streamlit Secrets.")
+                        # Process using Gemini
+                        try:
+                            response = client.models.generate_content(
+                                model="gemini-2.5-flash",
+                                contents=task_input
+                            )
+                            answer = response.text
+                        except Exception as e:
+                            answer = f"Error: {e}"
+                            
+                    st.info(f"**Answer:** {answer}")
+                    
+                    # Context-Aware WhatsApp Trigger
+                    if any(word in task_lower for word in ["whatsapp", "send", "ans", "reminder"]):
+                        try:
+                            phone_number = st.secrets["MY_PHONE_NUMBER"]
+                            account_sid = st.secrets["TWILIO_ACCOUNT_SID"]
+                            auth_token = st.secrets["TWILIO_AUTH_TOKEN"]
+                            
+                            tw_client = Client(account_sid, auth_token)
+                            message_body = f"🤖 AI Agent Task Result\n\nTask: {task_input}\nAnswer: {answer}"
+                            
+                            tw_client.messages.create(
+                                from_='whatsapp:+14155238886', # Twilio Sandbox Number
+                                body=message_body,
+                                to=f'whatsapp:{phone_number}'
+                            )
+                            st.success("Sent to your WhatsApp automatically based on your instruction!")
+                        except KeyError:
+                            st.error("Configuration Error: Please make sure MY_PHONE_NUMBER, TWILIO_ACCOUNT_SID, and TWILIO_AUTH_TOKEN are set in secrets.")
+                        except Exception as e:
+                            st.error(f"Failed to send message: {e}")
 
-                                                                   
+except Exception as e:
+    st.error(f"Error in app configuration. Please configure GEMINI_API_KEY in app settings. Details: {e}")
+                    
