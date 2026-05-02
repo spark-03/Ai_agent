@@ -2,13 +2,11 @@ import streamlit as st
 import os
 import sys
 import pandas as pd
-import importlib
 
 # Enforce the current working directory path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import orchestrator
-importlib.reload(orchestrator)
 
 st.set_page_config(page_title="Agent Orchestrator", layout="centered")
 
@@ -18,16 +16,6 @@ st.write("Welcome back! Interact with your orchestrator agent below.")
 @st.cache_resource
 def get_or_create_orchestrator():
     agent = orchestrator.AgentOrchestrator()
-    agent.register_tool("get_indian_datetime", orchestrator.get_indian_datetime, "Fetches current date and time in IST.")
-    agent.register_tool("get_stock_price", orchestrator.get_stock_price, "Fetches current stock values.")
-    agent.register_tool("get_live_weather", orchestrator.get_live_weather, "Fetches live weather data for a city.")
-    agent.register_tool("calculate_pump_power", orchestrator.calculate_pump_power, "Calculates required pump power (in HP).")
-    
-    # Registering new tools
-    agent.register_tool("calculate_cattle_feed_cost", orchestrator.calculate_cattle_feed_cost, "Calculates the daily and monthly feed cost for livestock.")
-    agent.register_tool("calculate_fertilizer_requirement", orchestrator.calculate_fertilizer_requirement, "Calculates the fertilizer requirement for a specific area.")
-    
-    agent.register_tool("web_search", orchestrator.web_search, "Searches the web for real-world information.")
     return agent
 
 agent = get_or_create_orchestrator()
@@ -37,10 +25,11 @@ if "messages" not in st.session_state:
 
 # Sidebar
 with st.sidebar:
-    st.subheader("🛠️ Available Tools")
-    for name, tool in agent.tools.items():
-        with st.expander(name):
-            st.caption(tool["description"])
+    st.subheader("🛠️ Automated Function Tools")
+    for func in agent.tools:
+        # Show tool definitions directly from docstrings
+        with st.expander(func.__name__):
+            st.caption(func.__doc__.strip() if func.__doc__ else "No description available.")
             
     st.markdown("---")
     st.subheader("🗄️ Database Logs & Analytics")
@@ -78,10 +67,8 @@ if prompt := st.chat_input("What would you like to do?"):
         
         if result["status"] == "success":
             response = result["response_text"]
-            with st.expander("Show raw data"):
+            with st.expander("Show raw result data"):
                 st.json(result["result"])
-        elif result["status"] == "idle":
-            response = result["message"]
         else:
             response = f"**Error:** {result['message']}"
             
@@ -89,3 +76,4 @@ if prompt := st.chat_input("What would you like to do?"):
         st.markdown(response)
         
     st.session_state.messages.append({"role": "assistant", "content": response})
+            
