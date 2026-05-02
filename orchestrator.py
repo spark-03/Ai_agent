@@ -85,8 +85,21 @@ def calculate_pump_power(flow_rate_lpm: float = 35.0, total_head_m: float = 24.3
 
 class GeminiIntentAnalyzer:
     def __init__(self, model="gemini-2.5-flash"):
-        # Initialized with the modern SDK (version 1.0+)
-        self.client = genai.Client()
+        api_key = os.environ.get("GEMINI_API_KEY")
+        
+        if not api_key:
+            try:
+                import streamlit as st
+                api_key = st.secrets.get("GEMINI_API_KEY")
+            except ImportError:
+                pass
+                
+        if api_key:
+            self.client = genai.Client(api_key=api_key)
+        else:
+            # Fallback to the default client constructor (reads from local config / environment)
+            self.client = genai.Client()
+            
         self.model = model
         
     def analyze(self, prompt: str, history=None):
@@ -121,7 +134,6 @@ class GeminiIntentAnalyzer:
             parsed = json.loads(response.text)
             return parsed
         except Exception as e:
-            # Fallback when the API fails
             return {"intent_matched": None, "tool": None, "arguments": {}}
 
 
