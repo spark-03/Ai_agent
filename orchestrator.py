@@ -5,22 +5,26 @@ from google import genai
 from twilio.rest import Client
 
 class AgentOrchestrator:
-    def __init__(self, gemini_api_key, twilio_sid=None, twilio_token=None, twilio_from=None, twilio_to=None):
-        """Initializes the local memory engine, Gemini AI, and Twilio client."""
+    def __init__(self, gemini_api_key, **kwargs):
+        """Initializes the local memory engine, Gemini AI, and Twilio client.
+        Accepts **kwargs to prevent unexpected argument errors."""
         self.data_folder = "agent_data"
         self.memory_file = os.path.join(self.data_folder, "memory.json")
         
         # Initialize Gemini API Client
         self.gemini_client = genai.Client(api_key=gemini_api_key)
         
-        # Initialize Twilio Client
-        self.twilio_sid = twilio_sid
-        self.twilio_token = twilio_token
-        self.twilio_from = twilio_from
-        self.twilio_to = twilio_to
+        # Safely extract Twilio credentials from kwargs
+        self.twilio_sid = kwargs.get("twilio_sid")
+        self.twilio_token = kwargs.get("twilio_token")
+        self.twilio_from = kwargs.get("twilio_from")
+        self.twilio_to = kwargs.get("twilio_to")
         
         if self.twilio_sid and self.twilio_token:
-            self.twilio_client = Client(self.twilio_sid, self.twilio_token)
+            try:
+                self.twilio_client = Client(self.twilio_sid, self.twilio_token)
+            except Exception:
+                self.twilio_client = None
         else:
             self.twilio_client = None
         
@@ -41,7 +45,7 @@ class AgentOrchestrator:
             return {}
 
     def _save_data(self, data):
-        """Helper to write data to the local JSON file."""
+        """Helper to write data to the JSON file."""
         with open(self.memory_file, "w") as f:
             json.dump(data, f, indent=4)
 
@@ -104,7 +108,6 @@ class AgentOrchestrator:
             idx = user_input_lower.find(matched_prefix) + len(matched_prefix)
             message_content = user_input[idx:].strip()
             
-            # Clean up introductory punctuation or filler words
             if message_content.startswith("that "):
                 message_content = message_content[5:].strip()
             if message_content.startswith(": "):
