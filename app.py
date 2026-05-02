@@ -1,12 +1,12 @@
 import streamlit as st
 import os
 import sys
-import sqlite3
 
-# Ensure the path contains orchestrator.py
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# 1. Enforce the current working directory
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from orchestrator import AgentOrchestrator, get_indian_datetime, get_stock_price, get_live_weather
+# 2. Import the orchestrator module
+import orchestrator
 
 st.set_page_config(page_title="Agent Orchestrator", layout="centered")
 
@@ -15,10 +15,10 @@ st.write("Welcome back! Interact with your orchestrator agent below.")
 
 @st.cache_resource
 def get_or_create_orchestrator():
-    agent = AgentOrchestrator()
-    agent.register_tool("get_indian_datetime", get_indian_datetime, "Fetches current date and time in IST.")
-    agent.register_tool("get_stock_price", get_stock_price, "Fetches current stock values.")
-    agent.register_tool("get_live_weather", get_live_weather, "Fetches live weather data for a city.")
+    agent = orchestrator.AgentOrchestrator()
+    agent.register_tool("get_indian_datetime", orchestrator.get_indian_datetime, "Fetches current date and time in IST.")
+    agent.register_tool("get_stock_price", orchestrator.get_stock_price, "Fetches current stock values.")
+    agent.register_tool("get_live_weather", orchestrator.get_live_weather, "Fetches live weather data for a city.")
     return agent
 
 agent = get_or_create_orchestrator()
@@ -37,6 +37,7 @@ with st.sidebar:
     st.markdown("---")
     st.subheader("🗄️ Database Logs")
     if st.button("Load Past Conversations"):
+        import sqlite3
         try:
             conn = sqlite3.connect("agent_memory.db")
             cursor = conn.cursor()
@@ -77,4 +78,4 @@ if prompt := st.chat_input("What would you like to do?"):
         st.markdown(response)
         
     st.session_state.messages.append({"role": "assistant", "content": response})
-                    
+    
