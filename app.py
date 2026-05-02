@@ -1,4 +1,11 @@
 import streamlit as st
+import os
+import json
+import sys
+
+# Ensure Python can find the orchestrator module
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from orchestrator import AgentOrchestrator, get_indian_datetime, get_stock_price
 
 st.set_page_config(page_title="Agent Orchestrator", layout="centered")
@@ -15,12 +22,7 @@ def get_or_create_orchestrator():
 
 agent = get_or_create_orchestrator()
 
-with st.sidebar:
-    st.subheader("🛠️ Available Tools")
-    for name, tool in agent.tools.items():
-        with st.expander(name):
-            st.caption(tool["description"])
-
+# --- Main Interaction Field ---
 user_input = st.text_input("Enter your request:", placeholder="e.g., What is the stock price of TCS?")
 
 if st.button("Execute Task", type="primary"):
@@ -37,3 +39,22 @@ if st.button("Execute Task", type="primary"):
                 st.info(result["message"])
             else:
                 st.error(result["message"])
+
+# --- History Section ---
+st.markdown("### 📜 Execution History")
+history_file = "agent_history.json"
+
+if os.path.exists(history_file):
+    try:
+        with open(history_file, "r") as f:
+            history = json.load(f)
+            
+        if history:
+            for timestamp, data in reversed(list(history.items())):
+                with st.expander(f"Task: {data['tool']} at {timestamp.split('T')[1][:8]}"):
+                    st.json(data["result"])
+        else:
+            st.info("No interactions recorded yet.")
+    except Exception:
+        st.info("No interactions recorded yet.")
+        
