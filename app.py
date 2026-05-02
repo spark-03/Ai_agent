@@ -11,7 +11,7 @@ import orchestrator
 st.set_page_config(page_title="Agent Orchestrator", layout="centered")
 
 st.title("🤖 Agent Orchestrator")
-st.write("Welcome back! Interact with your orchestrator agent below.")
+st.write("Welcome back! Interact with your orchestrator agent below. The agent will respond normally to everyday chat or route to tools for complex data queries.")
 
 @st.cache_resource
 def get_or_create_orchestrator():
@@ -63,6 +63,7 @@ if prompt := st.chat_input("What would you like to do?"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     with st.spinner("Processing request..."):
+        # The process_request function handles routing to tools or generating normal text automatically
         result = agent.process_request(prompt)
         
         if result["status"] == "success":
@@ -76,4 +77,5 @@ if prompt := st.chat_input("What would you like to do?"):
         st.markdown(response)
         
     st.session_state.messages.append({"role": "assistant", "content": response})
+    st.rerun()
     
