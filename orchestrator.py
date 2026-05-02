@@ -1,337 +1,99 @@
-import sqlite3
-from datetime import datetime
-from zoneinfo import ZoneInfo
 import os
+import json
+from datetime import datetime
 from google import genai
-from google.genai import types
-
-def get_indian_datetime():
-    """Fetches current date and time in India (IST)."""
-    ist_tz = ZoneInfo("Asia/Kolkata")
-    now = datetime.now(ist_tz)
-    return {
-        "date": now.strftime("%Y-%m-%d"),
-        "time": now.strftime("%H:%M:%S"),
-        "timestamp": now.isoformat(),
-        "year": now.year,
-        "month": now.month,
-        "day": now.day
-    }
-
-def get_stock_price(ticker: str):
-    """
-    Fetches current stock values.
-    
-    Args:
-        ticker: The stock ticker symbol (e.g., TCS, RELIANCE, INFY).
-    """
-    market_data = {
-        "TCS": {"price": 3850.50, "currency": "INR", "change": "+1.2%"},
-        "RELIANCE": {"price": 2850.00, "currency": "INR", "change": "-0.5%"},
-        "INFY": {"price": 1520.40, "currency": "INR", "change": "+0.8%"}
-    }
-    normalized = ticker.upper()
-    if normalized in market_data:
-        return {"status": "success", "ticker": normalized, "data": market_data[normalized]}
-    return {"status": "error", "message": f"Ticker '{ticker}' not found."}
-
-def get_live_weather(city: str = "Nellore"):
-    """
-    Fetches live weather data for a city.
-    
-    Args:
-        city: Name of the city (defaults to Nellore).
-    """
-    import json, urllib.request, urllib.parse
-    try:
-        url = f"https://wttr.in/{urllib.parse.quote(city)}?format=j1"
-        req = urllib.request.Request(
-            url, 
-            headers={'User-Agent': 'Mozilla/5.0'}
-        )
-        with urllib.request.urlopen(req, timeout=5) as response:
-            data = json.loads(response.read().decode('utf-8'))
-            current = data['current_condition'][0]
-            return {
-                "status": "success",
-                "city": city.capitalize(),
-                "temp_C": current['temp_C'],
-                "feels_like_C": current['FeelsLikeC'],
-                "condition": current['weatherDesc'][0]['value']
-            }
-    except Exception as e:
-        return {"status": "error", "message": f"Could not retrieve weather data: {str(e)}"}
-
-def calculate_pump_power(flow_rate_lpm: float = 35.0, total_head_m: float = 24.38, efficiency: float = 0.65):
-    """
-    Calculates required pump power (in HP).
-    
-    Args:
-        flow_rate_lpm: Flow rate in liters per minute.
-        total_head_m: Total head in meters.
-        efficiency: Pump efficiency (decimal value, e.g., 0.65).
-    """
-    hp = (flow_rate_lpm * total_head_m) / (4500 * efficiency)
-    return {
-        "status": "success",
-        "flow_rate_lpm": flow_rate_lpm,
-        "total_head_m": total_head_m,
-        "calculated_hp": round(hp, 3),
-        "efficiency": efficiency
-    }
-
-def calculate_cattle_feed_cost(num_cattle: int = 5, feed_per_day_kg: float = 12.0, cost_per_kg: float = 25.0):
-    """
-    Calculates the daily and monthly feed cost for livestock.
-    
-    Args:
-        num_cattle: Number of cattle.
-        feed_per_day_kg: Feed per day in kg per animal.
-        cost_per_kg: Cost per kg in INR.
-    """
-    daily_cost = num_cattle * feed_per_day_kg * cost_per_kg
-    monthly_cost = daily_cost * 30
-    return {
-        "status": "success",
-        "num_cattle": num_cattle,
-        "daily_cost": round(daily_cost, 2),
-        "monthly_cost": round(monthly_cost, 2),
-        "currency": "INR"
-    }
-
-def calculate_fertilizer_requirement(area_acres: float = 1.0, nitrogen_kg_per_acre: float = 50.0):
-    """
-    Calculates the fertilizer requirement for a specific area.
-    
-    Args:
-        area_acres: Plot area in acres.
-        nitrogen_kg_per_acre: Nitrogen required per acre in kg.
-    """
-    total_nitrogen = area_acres * nitrogen_kg_per_acre
-    return {
-        "status": "success",
-        "area_acres": area_acres,
-        "total_nitrogen_kg": round(total_nitrogen, 2),
-        "unit": "kg"
-    }
-
-def web_search(query: str):
-    """
-    Searches the web for real-world information.
-    
-    Args:
-        query: The search query.
-    """
-    return {
-        "status": "success",
-        "query": query,
-        "results": [
-            {
-                "title": f"Web search results for: {query}",
-                "snippet": "Latest information found via external live web search."
-            }
-        ]
-    }
-
-# ==========================================
-# ANGEL ONE SMARTAPI INTEGRATION TOOLS
-# ==========================================
-
-def get_angel_one_ltp(tradingsymbol: str, exchange: str = "NSE"):
-    """
-    Fetches the Last Traded Price (LTP) for a specific symbol using the Angel One SmartAPI.
-    
-    Args:
-        tradingsymbol: The trading symbol of the stock (e.g., RELIANCE-EQ).
-        exchange: The exchange (e.g., NSE, BSE, NFO).
-    """
-    try:
-        from SmartApi import SmartConnect
-        import pyotp
-        
-        api_key = os.environ.get("ANGEL_ONE_API_KEY")
-        client_code = os.environ.get("ANGEL_ONE_CLIENT_CODE")
-        pin = os.environ.get("ANGEL_ONE_PIN")
-        totp_secret = os.environ.get("ANGEL_ONE_TOTP_SECRET")
-        
-        if not api_key or not client_code or not pin or not totp_secret:
-            try:
-                import streamlit as st
-                api_key = api_key or st.secrets.get("ANGEL_ONE_API_KEY")
-                client_code = client_code or st.secrets.get("ANGEL_ONE_CLIENT_CODE")
-                pin = pin or st.secrets.get("ANGEL_ONE_PIN")
-                totp_secret = totp_secret or st.secrets.get("ANGEL_ONE_TOTP_SECRET")
-            except Exception:
-                pass
-                
-        if not api_key or not client_code or not pin or not totp_secret:
-            return {
-                "status": "success",
-                "symbol": tradingsymbol,
-                "exchange": exchange,
-                "ltp": 2850.00,
-                "message": "Authentication credentials not set in environment variables or Streamlit secrets. Using fallback data."
-            }
-            
-        obj = SmartConnect(api_key=api_key)
-        totp = pyotp.TOTP(totp_secret).now()
-        data = obj.generateSession(client_code, pin, totp)
-        
-        if data.get('status') == False:
-            return {"status": "error", "message": data.get('message', 'Failed to generate session')}
-            
-        return {
-            "status": "success",
-            "symbol": tradingsymbol,
-            "ltp": 2850.00,
-            "exchange": exchange,
-            "message": "LTP fetched successfully"
-        }
-    except Exception as e:
-        return {"status": "error", "message": f"Angel One API error: {str(e)}"}
-
-def place_angel_one_order(tradingsymbol: str, exchange: str = "NSE", transaction_type: str = "BUY", quantity: int = 1):
-    """
-    Places a direct order (BUY or SELL) on Angel One SmartAPI.
-    
-    Args:
-        tradingsymbol: Trading symbol of the stock (e.g., RELIANCE-EQ).
-        exchange: The exchange (e.g., NSE, BSE, NFO).
-        transaction_type: BUY or SELL.
-        quantity: Quantity of shares.
-    """
-    return {
-        "status": "success",
-        "action": f"Placed {transaction_type} order for {quantity} shares of {tradingsymbol}",
-        "exchange": exchange,
-        "quantity": quantity
-    }
-
 
 class AgentOrchestrator:
-    def __init__(self, db_path="agent_memory.db"):
-        api_key = os.environ.get("GEMINI_API_KEY")
+    def __init__(self, gemini_api_key):
+        """Initializes the local memory engine in a specific folder and sets up Gemini AI."""
+        self.data_folder = "agent_data"
+        self.memory_file = os.path.join(self.data_folder, "memory.json")
         
-        if not api_key:
-            try:
-                import streamlit as st
-                api_key = st.secrets.get("GEMINI_API_KEY")
-            except Exception:
-                pass
-                
-        if api_key:
-            self.client = genai.Client(api_key=api_key)
-        else:
-            self.client = genai.Client()
+        # Initialize Gemini API Client
+        self.gemini_client = genai.Client(api_key=gemini_api_key)
+        
+        # Ensure the target folder exists
+        if not os.path.exists(self.data_folder):
+            os.makedirs(self.data_folder)
             
-        self.model = "gemini-2.5-flash"
-        self.db_path = db_path
-        self.init_db()
-        
-        # Tools to pass to Gemini
-        self.tools = [
-            get_indian_datetime,
-            get_stock_price,
-            get_live_weather,
-            calculate_pump_power,
-            calculate_cattle_feed_cost,
-            calculate_fertilizer_requirement,
-            web_search,
-            get_angel_one_ltp,
-            place_angel_one_order
-        ]
-        
-        self.tool_map = {
-            "get_indian_datetime": get_indian_datetime,
-            "get_stock_price": get_stock_price,
-            "get_live_weather": get_live_weather,
-            "calculate_pump_power": calculate_pump_power,
-            "calculate_cattle_feed_cost": calculate_cattle_feed_cost,
-            "calculate_fertilizer_requirement": calculate_fertilizer_requirement,
-            "web_search": web_search,
-            "get_angel_one_ltp": get_angel_one_ltp,
-            "place_angel_one_order": place_angel_one_order
-        }
+        # Create an empty memory file if it does not exist
+        if not os.path.exists(self.memory_file):
+            self._save_data({})
 
-    def init_db(self):
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS memory (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT,
-                user_message TEXT,
-                tool_used TEXT,
-                response_text TEXT
-            )
-        ''')
-        conn.commit()
-        conn.close()
-
-    def save_to_db(self, user_message, tool_used, response_text):
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO memory (timestamp, user_message, tool_used, response_text)
-            VALUES (?, ?, ?, ?)
-        ''', (datetime.now().isoformat(), user_message, tool_used, response_text))
-        conn.commit()
-        conn.close()
-
-    def execute_tool(self, tool_name: str, kwargs: dict):
-        if tool_name not in self.tool_map:
-            raise KeyError(f"Tool '{tool_name}' is not registered in the system.")
-        return self.tool_map[tool_name](**kwargs)
-
-    def process_request(self, message: str):
+    def _load_data(self):
+        """Helper to read data from the local JSON file."""
         try:
-            # We add a system instruction to prevent the model from calling tools during normal chats
-            config = types.GenerateContentConfig(
-                tools=self.tools,
-                system_instruction=(
-                    "You are a helpful AI assistant. You have access to the provided tools "
-                    "(fetching weather, calculating power or cattle feed costs, and checking stock prices). "
-                    "Only call a tool when the user's prompt explicitly requests a task requiring external data, "
-                    "calculations, or real-time information. For casual greetings, normal conversation, "
-                    "or simple chat, do not call any tools."
-                )
-            )
-            
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=message,
-                config=config
-            )
-            
-            # Check if Gemini decided to call a function/tool
-            if response.function_calls:
-                tool_call = response.function_calls[0]
-                tool_name = tool_call.name
-                tool_args = tool_call.args
-                
-                result = self.execute_tool(tool_name, tool_args)
-                
-                response_text = f"**Tool Executed:** `{tool_name}`\n\n**Result:**\n```json\n{result}\n```"
-                self.save_to_db(message, tool_name, response_text)
-                
-                return {
-                    "status": "success",
-                    "response_text": response_text,
-                    "tool_used": tool_name,
-                    "result": result
-                }
-            
-            # No tool called, process as normal text
-            response_text = response.text
-            self.save_to_db(message, "Normal Text", response_text)
-            
-            return {
-                "status": "success",
-                "response_text": response_text,
-                "tool_used": "None",
-                "result": {"message": response_text}
+            with open(self.memory_file, "r") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def _save_data(self, data):
+        """Helper to write data to the local JSON file."""
+        with open(self.memory_file, "w") as f:
+            json.dump(data, f, indent=4)
+
+    def remember_fact(self, key: str, value: str):
+        """Saves a fact to the specific folder's memory file."""
+        try:
+            data = self._load_data()
+            data[key.lower()] = {
+                "original_key": key,
+                "value": value,
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
+            self._save_data(data)
+            return True
+        except Exception:
+            return False
+
+    def recall_fact(self, key_query: str):
+        """Recalls a fact from the specific folder's memory file."""
+        try:
+            data = self._load_data()
+            key_query_lower = key_query.lower()
             
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-    
+            # Search for a match in the keys
+            for k, v in data.items():
+                if key_query_lower in k or k in key_query_lower:
+                    return v["value"]
+            return None
+        except Exception:
+            return None
+
+    def route_query(self, user_input: str):
+        """Processes user input, updating memory or forwarding to Gemini."""
+        user_input_lower = user_input.lower()
+        response = ""
+
+        if user_input_lower.startswith("remember "):
+            parts = user_input.split(" is ")
+            if len(parts) == 2:
+                key = parts[0].replace("remember ", "").strip()
+                val = parts[1].strip()
+                if self.remember_fact(key, val):
+                    response = f"✅ **Saved to {self.data_folder}:** I will remember that `{key}` is `{val}`."
+                else:
+                    response = "⚠️ Failed to save fact to file."
+            else:
+                response = "⚠️ **Invalid Format:** Please use `Remember [key] is [value]`"
+
+        elif user_input_lower.startswith("do you remember ") or user_input_lower.startswith("tell me about "):
+            key = user_input.replace("do you remember", "").replace("tell me about", "").strip()
+            result = self.recall_fact(key)
+            if result:
+                response = f"🧠 **Fact Recalled:** {key} is **{result}**."
+            else:
+                response = f"❌ I could not find anything about `{key}` in your local memory."
+
+        else:
+            try:
+                chat_response = self.gemini_client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=f"You are a personal AI Agent. Keep responses concise. User input: {user_input}"
+                )
+                response = chat_response.text
+            except Exception:
+                response = f"🤖 **Orchestrator (Fallback):** You said: {user_input}"
+
+        return response
