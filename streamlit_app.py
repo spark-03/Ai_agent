@@ -403,4 +403,8 @@ def render_location_weather():
                 else:
                     st.error("Unable to fetch weather data for your location.")
             except Exception as e:
+                st.error("Failed to connect to the weather service.")
+        else:
+            st.warning("Please enable location permissions in your browser and try again.")
+
           
