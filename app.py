@@ -5,7 +5,7 @@ import sys
 # Ensure the path contains orchestrator.py
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from orchestrator import AgentOrchestrator, get_indian_datetime, get_stock_price, get_live_weather
+from orchestrator import Agentorchestrator, get_indian_datetime, get_stock_price, get_live_weather
 
 st.set_page_config(page_title="Agent Orchestrator", layout="centered")
 
