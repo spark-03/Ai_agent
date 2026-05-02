@@ -26,7 +26,6 @@ def init_agent():
             twilio_to=twilio_to
         )
     except Exception as e:
-        # Show the specific error message and exception details
         st.error(f"⚠️ Error initializing agent. Details: {e}")
         return None
 
