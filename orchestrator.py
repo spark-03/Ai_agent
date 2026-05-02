@@ -2,9 +2,10 @@ import sqlite3
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import json
-import os
 import urllib.request
 import urllib.parse
+import os
+from google import genai
 
 def get_indian_datetime():
     ist_tz = ZoneInfo("Asia/Kolkata")
@@ -82,76 +83,52 @@ def calculate_pump_power(flow_rate_lpm: float = 35.0, total_head_m: float = 24.3
     }
 
 
-class IntentAnalyzer:
-    def __init__(self):
-        self.intent_map = {
-            "time": {"tool": "get_indian_datetime", "keywords": ["time", "date", "clock", "ist"]},
-            "stock": {"tool": "get_stock_price", "keywords": ["price", "stock", "share", "market", "tcs", "reliance", "infy"]},
-            "weather": {"tool": "get_live_weather", "keywords": ["weather", "temperature", "forecast", "rain"]},
-            "calculator": {"tool": "calculate_pump_power", "keywords": ["calculate", "pump", "power", "water", "head", "motor"]},
-            "search": {"tool": "web_search", "keywords": ["search", "find", "news", "latest"]}
+class GeminiIntentAnalyzer:
+    def __init__(self, model="gemini-2.5-flash"):
+        # Initialized with the modern SDK (version 1.0+)
+        self.client = genai.Client()
+        self.model = model
+        
+    def analyze(self, prompt: str, history=None):
+        system_instruction = """
+        You are the brain of an agent orchestrator. Given a user prompt, return a valid JSON object matching this schema exactly:
+        {
+            "intent_matched": "time" | "stock" | "weather" | "calculator" | "search",
+            "tool": "get_indian_datetime" | "get_stock_price" | "get_live_weather" | "calculate_pump_power" | "web_search",
+            "arguments": { ... }
         }
 
-    def analyze(self, prompt: str, history=None):
-        prompt_lower = prompt.lower()
-        words = set(prompt_lower.split())
-        
-        best_intent = None
-        max_score = 0
-        
-        for intent_name, data in self.intent_map.items():
-            score = len(words.intersection(set(data["keywords"])))
-            for kw in data["keywords"]:
-                if kw in prompt_lower:
-                    score += 1
-                    
-            if score > max_score:
-                max_score = score
-                best_intent = intent_name
-                
-        if best_intent and max_score > 0:
-            data = self.intent_map[best_intent]
-            tool = data["tool"]
-            args = {}
+        Tool Argument Rules:
+        - get_indian_datetime: Empty object {}
+        - get_stock_price: {"ticker": "TCS"} or {"ticker": "RELIANCE"} or {"ticker": "INFY"}
+        - get_live_weather: {"city": "Nellore"} (infer the city from the user's text if present, otherwise default to "Nellore")
+        - calculate_pump_power: {"flow_rate_lpm": 35.0, "total_head_m": 24.38, "efficiency": 0.65}
+        - web_search: {"query": "Search query here"}
+
+        Provide ONLY the JSON response. Do not use markdown code blocks or backticks.
+        """
+        try:
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=prompt,
+                config={
+                    "system_instruction": system_instruction,
+                    "temperature": 0.0,
+                    "response_mime_type": "application/json"
+                }
+            )
             
-            if tool == "get_stock_price":
-                if "tcs" in prompt_lower: 
-                    args["ticker"] = "TCS"
-                elif "reliance" in prompt_lower: 
-                    args["ticker"] = "RELIANCE"
-                elif "infy" in prompt_lower: 
-                    args["ticker"] = "INFY"
-                else:
-                    args["ticker"] = "TCS"
-                    
-            elif tool == "get_live_weather":
-                target_city = "Nellore"
-                if "in " in prompt_lower:
-                    parts = prompt_lower.split("in ")
-                    target_city = parts[1].split()[0]
-                elif "of " in prompt_lower:
-                    parts = prompt_lower.split("of ")
-                    target_city = parts[1].split()[0]
-                args["city"] = target_city
-                
-            elif tool == "calculate_pump_power":
-                # Default parameters
-                args["flow_rate_lpm"] = 35.0
-                args["total_head_m"] = 24.38 # 80 feet roughly
-                args["efficiency"] = 0.65
-                
-            elif tool == "web_search":
-                args["query"] = prompt
-                
-            return {"intent_matched": best_intent, "tool": tool, "arguments": args}
-            
-        return {"intent_matched": None, "tool": None, "arguments": None}
+            parsed = json.loads(response.text)
+            return parsed
+        except Exception as e:
+            # Fallback when the API fails
+            return {"intent_matched": None, "tool": None, "arguments": {}}
 
 
 class AgentOrchestrator:
     def __init__(self, db_path="agent_memory.db"):
         self.tools = {}
-        self.analyzer = IntentAnalyzer()
+        self.analyzer = GeminiIntentAnalyzer()
         self.db_path = db_path
         self.init_db()
 
@@ -208,10 +185,10 @@ class AgentOrchestrator:
 
     def process_request(self, message: str):
         analysis = self.analyzer.analyze(message)
-        if not analysis["tool"]:
+        if not analysis.get("tool"):
             return {"status": "idle", "message": "I could not find a tool matching your request."}
             
-        execution_result = self.execute_tool(analysis["tool"], analysis["arguments"])
+        execution_result = self.execute_tool(analysis["tool"], analysis.get("arguments"))
         
         if execution_result["status"] == "success":
             response_text = self.generate_response(execution_result["tool"], execution_result["result"])
@@ -220,4 +197,4 @@ class AgentOrchestrator:
             self.save_to_db(message, execution_result["tool"], response_text)
             
         return execution_result
-            
+        
