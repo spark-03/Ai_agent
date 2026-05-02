@@ -82,6 +82,34 @@ def calculate_pump_power(flow_rate_lpm: float = 35.0, total_head_m: float = 24.3
         "efficiency": efficiency
     }
 
+# New Tool 1: Livestock Feed Cost Calculator
+def calculate_cattle_feed_cost(num_cattle: int = 5, feed_per_day_kg: float = 12.0, cost_per_kg: float = 25.0):
+    """
+    Calculates the daily and monthly cattle feed cost.
+    """
+    daily_cost = num_cattle * feed_per_day_kg * cost_per_kg
+    monthly_cost = daily_cost * 30
+    return {
+        "status": "success",
+        "num_cattle": num_cattle,
+        "daily_cost": round(daily_cost, 2),
+        "monthly_cost": round(monthly_cost, 2),
+        "currency": "INR"
+    }
+
+# New Tool 2: Fertilizer Requirement Calculator
+def calculate_fertilizer_requirement(area_acres: float = 1.0, nitrogen_kg_per_acre: float = 50.0):
+    """
+    Calculates the fertilizer requirement for an agricultural plot.
+    """
+    total_nitrogen = area_acres * nitrogen_kg_per_acre
+    return {
+        "status": "success",
+        "area_acres": area_acres,
+        "total_nitrogen_kg": round(total_nitrogen, 2),
+        "unit": "kg"
+    }
+
 
 class GeminiIntentAnalyzer:
     def __init__(self, model="gemini-2.5-flash"):
@@ -97,7 +125,6 @@ class GeminiIntentAnalyzer:
         if api_key:
             self.client = genai.Client(api_key=api_key)
         else:
-            # Fallback to the default client constructor (reads from local config / environment)
             self.client = genai.Client()
             
         self.model = model
@@ -106,16 +133,18 @@ class GeminiIntentAnalyzer:
         system_instruction = """
         You are the brain of an agent orchestrator. Given a user prompt, return a valid JSON object matching this schema exactly:
         {
-            "intent_matched": "time" | "stock" | "weather" | "calculator" | "search",
-            "tool": "get_indian_datetime" | "get_stock_price" | "get_live_weather" | "calculate_pump_power" | "web_search",
+            "intent_matched": "time" | "stock" | "weather" | "calculator" | "feed" | "fertilizer" | "search",
+            "tool": "get_indian_datetime" | "get_stock_price" | "get_live_weather" | "calculate_pump_power" | "calculate_cattle_feed_cost" | "calculate_fertilizer_requirement" | "web_search",
             "arguments": { ... }
         }
 
         Tool Argument Rules:
-        - get_indian_datetime: Empty object {}
+        - get_indian_datetime: {}
         - get_stock_price: {"ticker": "TCS"} or {"ticker": "RELIANCE"} or {"ticker": "INFY"}
-        - get_live_weather: {"city": "Nellore"} (infer the city from the user's text if present, otherwise default to "Nellore")
+        - get_live_weather: {"city": "Nellore"}
         - calculate_pump_power: {"flow_rate_lpm": 35.0, "total_head_m": 24.38, "efficiency": 0.65}
+        - calculate_cattle_feed_cost: {"num_cattle": 5, "feed_per_day_kg": 12.0, "cost_per_kg": 25.0}
+        - calculate_fertilizer_requirement: {"area_acres": 1.0, "nitrogen_kg_per_acre": 50.0}
         - web_search: {"query": "Search query here"}
 
         Provide ONLY the JSON response. Do not use markdown code blocks or backticks.
@@ -190,6 +219,10 @@ class AgentOrchestrator:
             return f"Error: {result['message']}"
         elif tool_name == "calculate_pump_power":
             return f"**Calculation result:** Required pump power is **{result['calculated_hp']} HP** based on {result['flow_rate_lpm']} LPM flow rate and a total head of {result['total_head_m']} meters at {int(result['efficiency']*100)}% efficiency."
+        elif tool_name == "calculate_cattle_feed_cost":
+            return f"**Livestock Feed Cost:** Daily cost is ₹{result['daily_cost']} and monthly cost is ₹{result['monthly_cost']} for {result['num_cattle']} cattle."
+        elif tool_name == "calculate_fertilizer_requirement":
+            return f"**Fertilizer Requirement:** Total nitrogen required is {result['total_nitrogen_kg']} {result['unit']} for {result['area_acres']} acres."
         elif tool_name == "web_search":
             res = result['results'][0]
             return f"**Search results for '{result['query']}':** {res['snippet']}"
@@ -209,4 +242,4 @@ class AgentOrchestrator:
             self.save_to_db(message, execution_result["tool"], response_text)
             
         return execution_result
-        
+                               
