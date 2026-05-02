@@ -57,7 +57,6 @@ def web_search(query: str):
     """
     Searches the web for real-world information and news.
     """
-    # Simulated search result to prevent third-party API dependencies
     return {
         "status": "success",
         "query": query,
@@ -81,37 +80,54 @@ class IntentAnalyzer:
 
     def analyze(self, prompt: str, history=None):
         prompt_lower = prompt.lower()
+        words = set(prompt_lower.split())
+        
+        best_intent = None
+        max_score = 0
+        
         for intent_name, data in self.intent_map.items():
+            # Calculate match score based on keyword overlap
+            score = len(words.intersection(set(data["keywords"])))
+            
+            # Check substrings inside the query
             for kw in data["keywords"]:
                 if kw in prompt_lower:
-                    tool = data["tool"]
-                    args = {}
+                    score += 1
                     
-                    if tool == "get_stock_price":
-                        if "tcs" in prompt_lower: 
-                            args["ticker"] = "TCS"
-                        elif "reliance" in prompt_lower: 
-                            args["ticker"] = "RELIANCE"
-                        elif "infy" in prompt_lower: 
-                            args["ticker"] = "INFY"
-                        else:
-                            args["ticker"] = "TCS"
-                            
-                    elif tool == "get_live_weather":
-                        target_city = "Nellore"
-                        if "in " in prompt_lower:
-                            parts = prompt_lower.split("in ")
-                            target_city = parts[1].split()[0]
-                        elif "of " in prompt_lower:
-                            parts = prompt_lower.split("of ")
-                            target_city = parts[1].split()[0]
-                        args["city"] = target_city
-                        
-                    elif tool == "web_search":
-                        args["query"] = prompt
-                        
-                    return {"intent_matched": intent_name, "tool": tool, "arguments": args}
+            if score > max_score:
+                max_score = score
+                best_intent = intent_name
+                
+        if best_intent and max_score > 0:
+            data = self.intent_map[best_intent]
+            tool = data["tool"]
+            args = {}
+            
+            if tool == "get_stock_price":
+                if "tcs" in prompt_lower: 
+                    args["ticker"] = "TCS"
+                elif "reliance" in prompt_lower: 
+                    args["ticker"] = "RELIANCE"
+                elif "infy" in prompt_lower: 
+                    args["ticker"] = "INFY"
+                else:
+                    args["ticker"] = "TCS"
                     
+            elif tool == "get_live_weather":
+                target_city = "Nellore"
+                if "in " in prompt_lower:
+                    parts = prompt_lower.split("in ")
+                    target_city = parts[1].split()[0]
+                elif "of " in prompt_lower:
+                    parts = prompt_lower.split("of ")
+                    target_city = parts[1].split()[0]
+                args["city"] = target_city
+                
+            elif tool == "web_search":
+                args["query"] = prompt
+                
+            return {"intent_matched": best_intent, "tool": tool, "arguments": args}
+            
         return {"intent_matched": None, "tool": None, "arguments": None}
 
 
