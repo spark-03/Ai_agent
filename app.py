@@ -5,19 +5,28 @@ from orchestrator import AgentOrchestrator
 st.set_page_config(page_title="Personal AI Agent", page_icon="🤖", layout="wide")
 st.title("🤖 Personal AI Agent - Free Local Orchestrator")
 
-# 2. Retrieve Gemini API Key from Streamlit Secrets
+# 2. Retrieve all keys automatically from Streamlit Secrets
 @st.cache_resource
 def init_agent():
     try:
-        # Reads from both possible secret key formats
-        if "GEMINI_API_KEY" in st.secrets:
-            api_key = st.secrets["GEMINI_API_KEY"]
-        else:
-            api_key = st.secrets["gemini_api_key"]
-            
-        return AgentOrchestrator(api_key)
+        # Get Gemini API key
+        api_key = st.secrets.get("GEMINI_API_KEY", st.secrets.get("gemini_api_key", ""))
+        
+        # Get Twilio credentials
+        twilio_sid = st.secrets.get("TWILIO_ACCOUNT_SID", "")
+        twilio_token = st.secrets.get("TWILIO_AUTH_TOKEN", "")
+        twilio_from = st.secrets.get("TWILIO_WHATSAPP_FROM", "")
+        twilio_to = st.secrets.get("TWILIO_WHATSAPP_TO", "")
+        
+        return AgentOrchestrator(
+            gemini_api_key=api_key,
+            twilio_sid=twilio_sid,
+            twilio_token=twilio_token,
+            twilio_from=twilio_from,
+            twilio_to=twilio_to
+        )
     except Exception as e:
-        st.error("⚠️ GEMINI_API_KEY not found in Streamlit secrets. Please check your .streamlit/secrets.toml file.")
+        st.error("⚠️ Error initializing agent. Please check your .streamlit/secrets.toml file.")
         return None
 
 agent = init_agent()
