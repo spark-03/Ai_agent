@@ -1,1 +1,42 @@
+name: Continuous Stock Monitor
 
+on:
+  schedule:
+    - cron: '*/15 * * * *' # Runs every 15 minutes
+  workflow_dispatch: # Allows manual execution from the Actions tab
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests twilio pandas streamlit
+      
+      - name: Run Monitor
+        env:
+          STREAMLIT_TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          STREAMLIT_TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          STREAMLIT_TWILIO_WHATSAPP_FROM: "whatsapp:+14155238886"
+          STREAMLIT_MY_PHONE_NUMBER: "+910000000000"
+        run: python stock_monitor.py
+      
+      - name: Commit and Push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add stock_data.csv
+          git commit -m "Update stock data points [skip ci]" || echo "No changes to commit"
+          git push origin main
+          
