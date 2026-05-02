@@ -26,7 +26,8 @@ def init_agent():
             twilio_to=twilio_to
         )
     except Exception as e:
-        st.error("⚠️ Error initializing agent. Please check your .streamlit/secrets.toml file.")
+        # Show the specific error message and exception details
+        st.error(f"⚠️ Error initializing agent. Details: {e}")
         return None
 
 agent = init_agent()
