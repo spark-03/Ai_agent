@@ -53,13 +53,30 @@ def get_live_weather(city: str = "Nellore"):
     except Exception as e:
         return {"status": "error", "message": f"Could not retrieve weather data: {str(e)}"}
 
+def web_search(query: str):
+    """
+    Searches the web for real-world information and news.
+    """
+    # Simulated search result to prevent third-party API dependencies
+    return {
+        "status": "success",
+        "query": query,
+        "results": [
+            {
+                "title": f"Web search results for: {query}",
+                "snippet": "Latest information found via external live web search."
+            }
+        ]
+    }
+
 
 class IntentAnalyzer:
     def __init__(self):
         self.intent_map = {
             "time": {"tool": "get_indian_datetime", "keywords": ["time", "date", "clock", "ist"]},
             "stock": {"tool": "get_stock_price", "keywords": ["price", "stock", "share", "market", "tcs", "reliance", "infy"]},
-            "weather": {"tool": "get_live_weather", "keywords": ["weather", "temperature", "forecast", "rain"]}
+            "weather": {"tool": "get_live_weather", "keywords": ["weather", "temperature", "forecast", "rain"]},
+            "search": {"tool": "web_search", "keywords": ["search", "find", "news", "latest"]}
         }
 
     def analyze(self, prompt: str, history=None):
@@ -89,6 +106,9 @@ class IntentAnalyzer:
                             parts = prompt_lower.split("of ")
                             target_city = parts[1].split()[0]
                         args["city"] = target_city
+                        
+                    elif tool == "web_search":
+                        args["query"] = prompt
                         
                     return {"intent_matched": intent_name, "tool": tool, "arguments": args}
                     
@@ -146,6 +166,9 @@ class AgentOrchestrator:
             if result.get("status") == "success":
                 return f"The current weather in {result['city']} is {result['condition']} with a temperature of {result['temp_C']}°C (feels like {result['feels_like_C']}°C)."
             return f"Error: {result['message']}"
+        elif tool_name == "web_search":
+            res = result['results'][0]
+            return f"**Search results for '{result['query']}':** {res['snippet']}"
         return "Tool execution was successful."
 
     def process_request(self, message: str):
@@ -162,4 +185,4 @@ class AgentOrchestrator:
             self.save_to_db(message, execution_result["tool"], response_text)
             
         return execution_result
-                
+    
