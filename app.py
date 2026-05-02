@@ -1,11 +1,14 @@
 import streamlit as st
 import os
 import sys
+import pandas as pd
+import importlib
 
 # Enforce the current working directory path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import orchestrator
+importlib.reload(orchestrator)
 
 st.set_page_config(page_title="Agent Orchestrator", layout="centered")
 
@@ -27,7 +30,7 @@ agent = get_or_create_orchestrator()
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Sidebar for Tool Inspection & History
+# Sidebar for Tool Inspection & Analytics
 with st.sidebar:
     st.subheader("🛠️ Available Tools")
     for name, tool in agent.tools.items():
@@ -35,23 +38,28 @@ with st.sidebar:
             st.caption(tool["description"])
             
     st.markdown("---")
-    st.subheader("🗄️ Database Logs")
-    if st.button("Load Past Conversations"):
-        import sqlite3
-        try:
-            conn = sqlite3.connect("agent_memory.db")
-            cursor = conn.cursor()
-            cursor.execute("SELECT timestamp, user_message, tool_used FROM memory ORDER BY id DESC LIMIT 5")
-            records = cursor.fetchall()
-            conn.close()
+    st.subheader("🗄️ Database Logs & Analytics")
+    
+    import sqlite3
+    try:
+        conn = sqlite3.connect("agent_memory.db")
+        df = pd.read_sql_query("SELECT timestamp, user_message, tool_used FROM memory ORDER BY id DESC", conn)
+        conn.close()
+        
+        if not df.empty:
+            st.metric(label="Total Interactions", value=len(df))
             
-            if records:
-                for rec in records:
-                    st.text(f"⏱️ {rec[0][:19]}\n   Msg: {rec[1]}\n   Tool: {rec[2]}")
-            else:
-                st.info("No logs in memory yet.")
-        except Exception:
-            st.warning("No database found.")
+            # Tool usage breakdown
+            tool_counts = df['tool_used'].value_counts()
+            st.bar_chart(tool_counts)
+            
+            with st.expander("Recent Logs"):
+                for index, row in df.head(5).iterrows():
+                    st.text(f"⏱️ {row['timestamp'][:19]}\n   Msg: {row['user_message']}\n   Tool: {row['tool_used']}")
+        else:
+            st.info("No logs in memory yet.")
+    except Exception:
+        st.warning("No database found.")
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -78,4 +86,4 @@ if prompt := st.chat_input("What would you like to do?"):
         st.markdown(response)
         
     st.session_state.messages.append({"role": "assistant", "content": response})
-    
+            
