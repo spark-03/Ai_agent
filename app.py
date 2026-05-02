@@ -1,9 +1,9 @@
 import streamlit as st
 import os
-import json
 import sys
+import json
 
-# Ensure Python can find the orchestrator module
+# Add the project directory to the system path to ensure imports work
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from orchestrator import AgentOrchestrator, get_indian_datetime, get_stock_price
@@ -11,7 +11,7 @@ from orchestrator import AgentOrchestrator, get_indian_datetime, get_stock_price
 st.set_page_config(page_title="Agent Orchestrator", layout="centered")
 
 st.title("🤖 Agent Orchestrator")
-st.write("Welcome back! Use the modular orchestrator interface below to run your tools.")
+st.write("Welcome back! Interact with your orchestrator agent below.")
 
 @st.cache_resource
 def get_or_create_orchestrator():
@@ -22,39 +22,36 @@ def get_or_create_orchestrator():
 
 agent = get_or_create_orchestrator()
 
-# --- Main Interaction Field ---
-user_input = st.text_input("Enter your request:", placeholder="e.g., What is the stock price of TCS?")
+# Initialize or retrieve chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-if st.button("Execute Task", type="primary"):
-    if user_input.strip() == "":
-        st.warning("Please enter a command to process.")
-    else:
-        with st.spinner("Analyzing request and running orchestrator..."):
-            result = agent.process_request(user_input)
-            
-            if result["status"] == "success":
-                st.success(f"Action completed using tool: {result['tool']}")
-                st.json(result["result"])
-            elif result["status"] == "idle":
-                st.info(result["message"])
-            else:
-                st.error(result["message"])
+# Display previous chat messages
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-# --- History Section ---
-st.markdown("### 📜 Execution History")
-history_file = "agent_history.json"
-
-if os.path.exists(history_file):
-    try:
-        with open(history_file, "r") as f:
-            history = json.load(f)
-            
-        if history:
-            for timestamp, data in reversed(list(history.items())):
-                with st.expander(f"Task: {data['tool']} at {timestamp.split('T')[1][:8]}"):
-                    st.json(data["result"])
-        else:
-            st.info("No interactions recorded yet.")
-    except Exception:
-        st.info("No interactions recorded yet.")
+# Accept user input
+if prompt := st.chat_input("What would you like to do? (e.g., What is the stock price of TCS?)"):
+    # 1. Display and store user message
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    
+    # 2. Generate agent response using the orchestrator
+    with st.spinner("Processing request..."):
+        result = agent.process_request(prompt)
         
+        if result["status"] == "success":
+            response = f"**Tool used:** `{result['tool']}`\n\n"
+            response += f"```json\n{json.dumps(result['result'], indent=4)}\n```"
+        elif result["status"] == "idle":
+            response = result["message"]
+        else:
+            response = f"**Error:** {result['message']}"
+            
+    # 3. Display and store assistant response
+    with st.chat_message("assistant"):
+        st.markdown(response)
+    st.session_state.messages.append({"role": "assistant", "content": response})
+    
