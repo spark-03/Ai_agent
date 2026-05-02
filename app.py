@@ -1,11 +1,12 @@
 import streamlit as st
 import os
 import sys
+import sqlite3
 
 # Ensure the path contains orchestrator.py
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from orchestrator import Agentorchestrator, get_indian_datetime, get_stock_price, get_live_weather
+from orchestrator import AgentOrchestrator, get_indian_datetime, get_stock_price, get_live_weather
 
 st.set_page_config(page_title="Agent Orchestrator", layout="centered")
 
@@ -26,18 +27,36 @@ agent = get_or_create_orchestrator()
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Sidebar for Tool Inspection
+# Sidebar for Tool Inspection & History
 with st.sidebar:
     st.subheader("🛠️ Available Tools")
     for name, tool in agent.tools.items():
         with st.expander(name):
             st.caption(tool["description"])
+            
+    st.markdown("---")
+    st.subheader("🗄️ Database Logs")
+    if st.button("Load Past Conversations"):
+        try:
+            conn = sqlite3.connect("agent_memory.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT timestamp, user_message, tool_used FROM memory ORDER BY id DESC LIMIT 5")
+            records = cursor.fetchall()
+            conn.close()
+            
+            if records:
+                for rec in records:
+                    st.text(f"⏱️ {rec[0][:19]}\n   Msg: {rec[1]}\n   Tool: {rec[2]}")
+            else:
+                st.info("No logs in memory yet.")
+        except Exception:
+            st.warning("No database found.")
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("What would you like to do? (e.g., Get weather in Nellore)"):
+if prompt := st.chat_input("What would you like to do?"):
     with st.chat_message("user"):
         st.markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -58,4 +77,4 @@ if prompt := st.chat_input("What would you like to do? (e.g., Get weather in Nel
         st.markdown(response)
         
     st.session_state.messages.append({"role": "assistant", "content": response})
-    
+                    
