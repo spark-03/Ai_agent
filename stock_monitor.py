@@ -2,14 +2,13 @@ import os
 import requests
 import pandas as pd
 from datetime import datetime
-import streamlit as st
 from twilio.rest import Client
 
-# --- Load configuration via Streamlit Secrets ---
-TWILIO_ACCOUNT_SID = st.secrets["TWILIO_ACCOUNT_SID"]
-TWILIO_AUTH_TOKEN = st.secrets["TWILIO_AUTH_TOKEN"]
-TWILIO_WHATSAPP_FROM = st.secrets["TWILIO_WHATSAPP_FROM"]
-MY_PHONE_NUMBER = st.secrets["MY_PHONE_NUMBER"]
+# --- Load configuration using standard Environment Variables ---
+TWILIO_ACCOUNT_SID = os.environ.get("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
+TWILIO_WHATSAPP_FROM = os.environ.get("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")
+MY_PHONE_NUMBER = os.environ.get("MY_PHONE_NUMBER")
 
 def fetch_live_price(symbol):
     """Fetches the latest price using the AlphaVantage API."""
@@ -40,7 +39,7 @@ def monitor_stocks():
     symbols = ["RELIANCE.NS", "TCS.NS"]
     filename = "stock_data.csv"
     
-    # Load existing data
+    # Load existing data or create new
     if os.path.exists(filename):
         df = pd.read_csv(filename)
     else:
