@@ -21,8 +21,12 @@ def get_or_create_orchestrator():
     agent.register_tool("get_indian_datetime", orchestrator.get_indian_datetime, "Fetches current date and time in IST.")
     agent.register_tool("get_stock_price", orchestrator.get_stock_price, "Fetches current stock values.")
     agent.register_tool("get_live_weather", orchestrator.get_live_weather, "Fetches live weather data for a city.")
-    # Added utility
     agent.register_tool("calculate_pump_power", orchestrator.calculate_pump_power, "Calculates required pump power (in HP).")
+    
+    # Registering new tools
+    agent.register_tool("calculate_cattle_feed_cost", orchestrator.calculate_cattle_feed_cost, "Calculates the daily and monthly feed cost for livestock.")
+    agent.register_tool("calculate_fertilizer_requirement", orchestrator.calculate_fertilizer_requirement, "Calculates the fertilizer requirement for a specific area.")
+    
     agent.register_tool("web_search", orchestrator.web_search, "Searches the web for real-world information.")
     return agent
 
@@ -85,4 +89,3 @@ if prompt := st.chat_input("What would you like to do?"):
         st.markdown(response)
         
     st.session_state.messages.append({"role": "assistant", "content": response})
-        
