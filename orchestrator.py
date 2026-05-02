@@ -3,6 +3,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import os
 from google import genai
+from google.genai import types
 
 def get_indian_datetime():
     """Fetches current date and time in India (IST)."""
@@ -148,13 +149,11 @@ def get_angel_one_ltp(tradingsymbol: str, exchange: str = "NSE"):
         from SmartApi import SmartConnect
         import pyotp
         
-        # 1. Attempt to get credentials from os.environ
         api_key = os.environ.get("ANGEL_ONE_API_KEY")
         client_code = os.environ.get("ANGEL_ONE_CLIENT_CODE")
         pin = os.environ.get("ANGEL_ONE_PIN")
         totp_secret = os.environ.get("ANGEL_ONE_TOTP_SECRET")
         
-        # 2. Fallback to Streamlit secrets if environment variables are empty
         if not api_key or not client_code or not pin or not totp_secret:
             try:
                 import streamlit as st
@@ -165,7 +164,6 @@ def get_angel_one_ltp(tradingsymbol: str, exchange: str = "NSE"):
             except Exception:
                 pass
                 
-        # Still not configured? Return fallback data.
         if not api_key or not client_code or not pin or not totp_secret:
             return {
                 "status": "success",
@@ -212,7 +210,6 @@ def place_angel_one_order(tradingsymbol: str, exchange: str = "NSE", transaction
 
 class AgentOrchestrator:
     def __init__(self, db_path="agent_memory.db"):
-        # Attempt to get GEMINI_API_KEY from environment or secrets
         api_key = os.environ.get("GEMINI_API_KEY")
         
         if not api_key:
@@ -231,6 +228,7 @@ class AgentOrchestrator:
         self.db_path = db_path
         self.init_db()
         
+        # Tools to pass to Gemini
         self.tools = [
             get_indian_datetime,
             get_stock_price,
@@ -242,6 +240,19 @@ class AgentOrchestrator:
             get_angel_one_ltp,
             place_angel_one_order
         ]
+        
+        # Add a mapping dictionary to match the function's string name to its executable reference
+        self.tool_map = {
+            "get_indian_datetime": get_indian_datetime,
+            "get_stock_price": get_stock_price,
+            "get_live_weather": get_live_weather,
+            "calculate_pump_power": calculate_pump_power,
+            "calculate_cattle_feed_cost": calculate_cattle_feed_cost,
+            "calculate_fertilizer_requirement": calculate_fertilizer_requirement,
+            "web_search": web_search,
+            "get_angel_one_ltp": get_angel_one_ltp,
+            "place_angel_one_order": place_angel_one_order
+        }
 
     def init_db(self):
         conn = sqlite3.connect(self.db_path)
@@ -268,14 +279,23 @@ class AgentOrchestrator:
         conn.commit()
         conn.close()
 
+    def execute_tool(self, tool_name: str, kwargs: dict):
+        """Executes the mapped tool by name to prevent KeyErrors."""
+        if tool_name not in self.tool_map:
+            raise KeyError(f"Tool '{tool_name}' is not registered in the system.")
+        return self.tool_map[tool_name](**kwargs)
+
     def process_request(self, message: str):
         try:
+            # Use the correct SDK configuration type for the tools array
+            config = types.GenerateContentConfig(
+                tools=self.tools
+            )
+            
             response = self.client.models.generate_content(
                 model=self.model,
                 contents=message,
-                config={
-                    "tools": self.tools
-                }
+                config=config
             )
             
             response_text = response.text
@@ -288,4 +308,4 @@ class AgentOrchestrator:
             }
         except Exception as e:
             return {"status": "error", "message": str(e)}
-            
+    
