@@ -241,7 +241,6 @@ class AgentOrchestrator:
             place_angel_one_order
         ]
         
-        # Add a mapping dictionary to match the function's string name to its executable reference
         self.tool_map = {
             "get_indian_datetime": get_indian_datetime,
             "get_stock_price": get_stock_price,
@@ -280,15 +279,22 @@ class AgentOrchestrator:
         conn.close()
 
     def execute_tool(self, tool_name: str, kwargs: dict):
-        """Executes the mapped tool by name to prevent KeyErrors."""
         if tool_name not in self.tool_map:
             raise KeyError(f"Tool '{tool_name}' is not registered in the system.")
         return self.tool_map[tool_name](**kwargs)
 
     def process_request(self, message: str):
         try:
+            # We add a system instruction to prevent the model from calling tools during normal chats
             config = types.GenerateContentConfig(
-                tools=self.tools
+                tools=self.tools,
+                system_instruction=(
+                    "You are a helpful AI assistant. You have access to the provided tools "
+                    "(fetching weather, calculating power or cattle feed costs, and checking stock prices). "
+                    "Only call a tool when the user's prompt explicitly requests a task requiring external data, "
+                    "calculations, or real-time information. For casual greetings, normal conversation, "
+                    "or simple chat, do not call any tools."
+                )
             )
             
             response = self.client.models.generate_content(
