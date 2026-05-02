@@ -4,3 +4,5 @@ beautifulsoup4
 requests
 twilio
 streamlit-geolocation
+pyotp
+smartapi-python
