@@ -79,8 +79,7 @@ class IntentAnalyzer:
                             args["ticker"] = "TCS"
                             
                     elif tool == "get_live_weather":
-                        # Attempt to extract location name (e.g., city name following 'in' or 'of')
-                        target_city = "Nellore" # Fallback location
+                        target_city = "Nellore"
                         if "in " in prompt_lower:
                             parts = prompt_lower.split("in ")
                             target_city = parts[1].split()[0]
@@ -134,3 +133,4 @@ class AgentOrchestrator:
             
         self.memory.append({"user": message, "response": execution_result})
         return execution_result
+                            
