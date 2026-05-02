@@ -148,19 +148,31 @@ def get_angel_one_ltp(tradingsymbol: str, exchange: str = "NSE"):
         from SmartApi import SmartConnect
         import pyotp
         
+        # 1. Attempt to get credentials from os.environ
         api_key = os.environ.get("ANGEL_ONE_API_KEY")
         client_code = os.environ.get("ANGEL_ONE_CLIENT_CODE")
         pin = os.environ.get("ANGEL_ONE_PIN")
         totp_secret = os.environ.get("ANGEL_ONE_TOTP_SECRET")
         
-        # Fallback if the user environment variables are not loaded yet
+        # 2. Fallback to Streamlit secrets if environment variables are empty
+        if not api_key or not client_code or not pin or not totp_secret:
+            try:
+                import streamlit as st
+                api_key = api_key or st.secrets.get("ANGEL_ONE_API_KEY")
+                client_code = client_code or st.secrets.get("ANGEL_ONE_CLIENT_CODE")
+                pin = pin or st.secrets.get("ANGEL_ONE_PIN")
+                totp_secret = totp_secret or st.secrets.get("ANGEL_ONE_TOTP_SECRET")
+            except Exception:
+                pass
+                
+        # Still not configured? Return fallback data.
         if not api_key or not client_code or not pin or not totp_secret:
             return {
                 "status": "success",
                 "symbol": tradingsymbol,
                 "exchange": exchange,
                 "ltp": 2850.00,
-                "message": "Environment values not fully set, using fallback data."
+                "message": "Authentication credentials not set in environment variables or Streamlit secrets. Using fallback data."
             }
             
         obj = SmartConnect(api_key=api_key)
@@ -170,7 +182,6 @@ def get_angel_one_ltp(tradingsymbol: str, exchange: str = "NSE"):
         if data.get('status') == False:
             return {"status": "error", "message": data.get('message', 'Failed to generate session')}
             
-        # Add your fetch logic here
         return {
             "status": "success",
             "symbol": tradingsymbol,
@@ -201,13 +212,14 @@ def place_angel_one_order(tradingsymbol: str, exchange: str = "NSE", transaction
 
 class AgentOrchestrator:
     def __init__(self, db_path="agent_memory.db"):
+        # Attempt to get GEMINI_API_KEY from environment or secrets
         api_key = os.environ.get("GEMINI_API_KEY")
         
         if not api_key:
             try:
                 import streamlit as st
                 api_key = st.secrets.get("GEMINI_API_KEY")
-            except ImportError:
+            except Exception:
                 pass
                 
         if api_key:
@@ -219,7 +231,6 @@ class AgentOrchestrator:
         self.db_path = db_path
         self.init_db()
         
-        # Tools to pass to Gemini
         self.tools = [
             get_indian_datetime,
             get_stock_price,
@@ -259,7 +270,6 @@ class AgentOrchestrator:
 
     def process_request(self, message: str):
         try:
-            # Pass our tools list directly to the config of the GenerateContent call
             response = self.client.models.generate_content(
                 model=self.model,
                 contents=message,
@@ -269,8 +279,6 @@ class AgentOrchestrator:
             )
             
             response_text = response.text
-            
-            # Save interaction logs
             self.save_to_db(message, "Automated Function", response_text)
             
             return {
@@ -280,4 +288,4 @@ class AgentOrchestrator:
             }
         except Exception as e:
             return {"status": "error", "message": str(e)}
-    
+            
