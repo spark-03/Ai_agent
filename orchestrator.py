@@ -68,6 +68,19 @@ def web_search(query: str):
         ]
     }
 
+def calculate_pump_power(flow_rate_lpm: float = 35.0, total_head_m: float = 24.38, efficiency: float = 0.65):
+    """
+    Calculates required motor power in HP (Horsepower).
+    """
+    hp = (flow_rate_lpm * total_head_m) / (4500 * efficiency)
+    return {
+        "status": "success",
+        "flow_rate_lpm": flow_rate_lpm,
+        "total_head_m": total_head_m,
+        "calculated_hp": round(hp, 3),
+        "efficiency": efficiency
+    }
+
 
 class IntentAnalyzer:
     def __init__(self):
@@ -75,6 +88,7 @@ class IntentAnalyzer:
             "time": {"tool": "get_indian_datetime", "keywords": ["time", "date", "clock", "ist"]},
             "stock": {"tool": "get_stock_price", "keywords": ["price", "stock", "share", "market", "tcs", "reliance", "infy"]},
             "weather": {"tool": "get_live_weather", "keywords": ["weather", "temperature", "forecast", "rain"]},
+            "calculator": {"tool": "calculate_pump_power", "keywords": ["calculate", "pump", "power", "water", "head", "motor"]},
             "search": {"tool": "web_search", "keywords": ["search", "find", "news", "latest"]}
         }
 
@@ -86,10 +100,7 @@ class IntentAnalyzer:
         max_score = 0
         
         for intent_name, data in self.intent_map.items():
-            # Calculate match score based on keyword overlap
             score = len(words.intersection(set(data["keywords"])))
-            
-            # Check substrings inside the query
             for kw in data["keywords"]:
                 if kw in prompt_lower:
                     score += 1
@@ -122,6 +133,12 @@ class IntentAnalyzer:
                     parts = prompt_lower.split("of ")
                     target_city = parts[1].split()[0]
                 args["city"] = target_city
+                
+            elif tool == "calculate_pump_power":
+                # Default parameters
+                args["flow_rate_lpm"] = 35.0
+                args["total_head_m"] = 24.38 # 80 feet roughly
+                args["efficiency"] = 0.65
                 
             elif tool == "web_search":
                 args["query"] = prompt
@@ -182,6 +199,8 @@ class AgentOrchestrator:
             if result.get("status") == "success":
                 return f"The current weather in {result['city']} is {result['condition']} with a temperature of {result['temp_C']}°C (feels like {result['feels_like_C']}°C)."
             return f"Error: {result['message']}"
+        elif tool_name == "calculate_pump_power":
+            return f"**Calculation result:** Required pump power is **{result['calculated_hp']} HP** based on {result['flow_rate_lpm']} LPM flow rate and a total head of {result['total_head_m']} meters at {int(result['efficiency']*100)}% efficiency."
         elif tool_name == "web_search":
             res = result['results'][0]
             return f"**Search results for '{result['query']}':** {res['snippet']}"
@@ -201,4 +220,4 @@ class AgentOrchestrator:
             self.save_to_db(message, execution_result["tool"], response_text)
             
         return execution_result
-    
+            
