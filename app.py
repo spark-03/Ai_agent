@@ -21,16 +21,17 @@ def get_or_create_orchestrator():
     agent.register_tool("get_indian_datetime", orchestrator.get_indian_datetime, "Fetches current date and time in IST.")
     agent.register_tool("get_stock_price", orchestrator.get_stock_price, "Fetches current stock values.")
     agent.register_tool("get_live_weather", orchestrator.get_live_weather, "Fetches live weather data for a city.")
+    # Added utility
+    agent.register_tool("calculate_pump_power", orchestrator.calculate_pump_power, "Calculates required pump power (in HP).")
     agent.register_tool("web_search", orchestrator.web_search, "Searches the web for real-world information.")
     return agent
 
 agent = get_or_create_orchestrator()
 
-# Display or retrieve chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Sidebar for Tool Inspection & Analytics
+# Sidebar
 with st.sidebar:
     st.subheader("🛠️ Available Tools")
     for name, tool in agent.tools.items():
@@ -48,8 +49,6 @@ with st.sidebar:
         
         if not df.empty:
             st.metric(label="Total Interactions", value=len(df))
-            
-            # Tool usage breakdown
             tool_counts = df['tool_used'].value_counts()
             st.bar_chart(tool_counts)
             
@@ -86,4 +85,4 @@ if prompt := st.chat_input("What would you like to do?"):
         st.markdown(response)
         
     st.session_state.messages.append({"role": "assistant", "content": response})
-            
+        
