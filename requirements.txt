@@ -8,3 +8,4 @@ pyotp
 smartapi-python
 pandas
 logzero
+websocket-client
