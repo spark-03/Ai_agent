@@ -2,10 +2,9 @@ import streamlit as st
 import os
 import sys
 
-# 1. Enforce the current working directory
+# Enforce the current working directory path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# 2. Import the orchestrator module
 import orchestrator
 
 st.set_page_config(page_title="Agent Orchestrator", layout="centered")
@@ -19,6 +18,7 @@ def get_or_create_orchestrator():
     agent.register_tool("get_indian_datetime", orchestrator.get_indian_datetime, "Fetches current date and time in IST.")
     agent.register_tool("get_stock_price", orchestrator.get_stock_price, "Fetches current stock values.")
     agent.register_tool("get_live_weather", orchestrator.get_live_weather, "Fetches live weather data for a city.")
+    agent.register_tool("web_search", orchestrator.web_search, "Searches the web for real-world information.")
     return agent
 
 agent = get_or_create_orchestrator()
