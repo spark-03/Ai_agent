@@ -403,4 +403,3 @@ def render_location_weather():
                 else:
                     st.error("Unable to fetch weather data for your location.")
             except Exception as e:
-          
