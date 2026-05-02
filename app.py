@@ -5,38 +5,34 @@ from orchestrator import AgentOrchestrator
 st.set_page_config(page_title="Personal AI Agent", page_icon="🤖", layout="wide")
 st.title("🤖 Personal AI Agent - Free Local Orchestrator")
 
-# 2. Get API Key directly inside the UI
-if "gemini_api_key" not in st.session_state:
-    st.session_state["gemini_api_key"] = ""
+# 2. Retrieve Gemini API Key from Streamlit Secrets
+@st.cache_resource
+def init_agent():
+    try:
+        # Reads from both possible secret key formats
+        if "GEMINI_API_KEY" in st.secrets:
+            api_key = st.secrets["GEMINI_API_KEY"]
+        else:
+            api_key = st.secrets["gemini_api_key"]
+            
+        return AgentOrchestrator(api_key)
+    except Exception as e:
+        st.error("⚠️ GEMINI_API_KEY not found in Streamlit secrets. Please check your .streamlit/secrets.toml file.")
+        return None
 
-api_key_input = st.text_input(
-    "🔑 Enter your Gemini API Key:", 
-    type="password", 
-    value=st.session_state["gemini_api_key"]
-)
+agent = init_agent()
 
-if api_key_input:
-    st.session_state["gemini_api_key"] = api_key_input
-
-if not st.session_state["gemini_api_key"]:
-    st.info("⚠️ Please enter your Gemini API Key to proceed.")
-else:
-    # Initialize the agent with the provided API key
-    @st.cache_resource
-    def init_agent(key):
-        return AgentOrchestrator(key)
-
-    agent = init_agent(st.session_state["gemini_api_key"])
-
-    # Initialize Message History
+if agent:
+    # 3. Initialize Message History
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
+    # Display Chat History
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
 
-    # Process User Input
+    # 4. Process User Input
     if user_input := st.chat_input("Enter your command, question, or fact to remember:"):
         st.session_state.messages.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
