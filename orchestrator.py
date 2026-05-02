@@ -74,7 +74,7 @@ class AgentOrchestrator:
     def send_whatsapp_message(self, message_text: str):
         """Sends a message using the Twilio API."""
         if not self.twilio_client or not self.twilio_from or not self.twilio_to:
-            return "⚠️ Twilio credentials are not set or incomplete in secrets."
+            return "⚠️ Twilio credentials are not set or incomplete in your secrets."
         
         try:
             message = self.twilio_client.messages.create(
@@ -101,7 +101,6 @@ class AgentOrchestrator:
                 break
 
         if matched_prefix:
-            # Extract content after the matching keyword
             idx = user_input_lower.find(matched_prefix) + len(matched_prefix)
             message_content = user_input[idx:].strip()
             
