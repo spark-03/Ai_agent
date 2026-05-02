@@ -50,7 +50,6 @@ class IntentAnalyzer:
                         elif "infy" in prompt_lower: 
                             args["ticker"] = "INFY"
                         else:
-                            # Check history or default
                             args["ticker"] = "TCS"
                     return {"intent_matched": intent_name, "tool": tool, "arguments": args}
         return {"intent_matched": None, "tool": None, "arguments": None}
@@ -60,7 +59,7 @@ class AgentOrchestrator:
     def __init__(self):
         self.tools = {}
         self.analyzer = IntentAnalyzer()
-        self.memory = []  # Added internal memory
+        self.memory = []
 
     def register_tool(self, name, function_ref, description):
         self.tools[name] = {"function": function_ref, "description": description}
@@ -71,6 +70,15 @@ class AgentOrchestrator:
             return {"status": "success", "tool": tool_name, "result": tool["function"](**arguments)}
         return {"status": "success", "tool": tool_name, "result": tool["function"]()}
 
+    def generate_response(self, tool_name, result):
+        """Generates a natural language response based on the tool execution result."""
+        if tool_name == "get_indian_datetime":
+            return f"It is currently {result['time']} on {result['date']} in India (IST)."
+        elif tool_name == "get_stock_price":
+            data = result['data']
+            return f"The current price for {result['ticker']} is ₹{data['price']} with a change of {data['change']}."
+        return "Tool execution was successful."
+
     def process_request(self, message: str):
         analysis = self.analyzer.analyze(message, history=self.memory)
         if not analysis["tool"]:
@@ -78,7 +86,10 @@ class AgentOrchestrator:
             
         execution_result = self.execute_tool(analysis["tool"], analysis["arguments"])
         
-        # Save to memory stack
+        if execution_result["status"] == "success":
+            response_text = self.generate_response(execution_result["tool"], execution_result["result"])
+            execution_result["response_text"] = response_text
+            
         self.memory.append({"user": message, "response": execution_result})
         return execution_result
-    
+        
