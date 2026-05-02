@@ -287,7 +287,6 @@ class AgentOrchestrator:
 
     def process_request(self, message: str):
         try:
-            # Use the correct SDK configuration type for the tools array
             config = types.GenerateContentConfig(
                 tools=self.tools
             )
@@ -298,14 +297,35 @@ class AgentOrchestrator:
                 config=config
             )
             
+            # Check if Gemini decided to call a function/tool
+            if response.function_calls:
+                tool_call = response.function_calls[0]
+                tool_name = tool_call.name
+                tool_args = tool_call.args
+                
+                result = self.execute_tool(tool_name, tool_args)
+                
+                response_text = f"**Tool Executed:** `{tool_name}`\n\n**Result:**\n```json\n{result}\n```"
+                self.save_to_db(message, tool_name, response_text)
+                
+                return {
+                    "status": "success",
+                    "response_text": response_text,
+                    "tool_used": tool_name,
+                    "result": result
+                }
+            
+            # No tool called, process as normal text
             response_text = response.text
-            self.save_to_db(message, "Automated Function", response_text)
+            self.save_to_db(message, "Normal Text", response_text)
             
             return {
                 "status": "success",
                 "response_text": response_text,
-                "result": {"message": response_text},
+                "tool_used": "None",
+                "result": {"message": response_text}
             }
+            
         except Exception as e:
             return {"status": "error", "message": str(e)}
     
