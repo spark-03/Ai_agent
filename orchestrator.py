@@ -1,3 +1,4 @@
+import sqlite3
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import json
@@ -93,11 +94,37 @@ class IntentAnalyzer:
         return {"intent_matched": None, "tool": None, "arguments": None}
 
 
-class Agentorchestrator:
-    def __init__(self):
+class AgentOrchestrator:
+    def __init__(self, db_path="agent_memory.db"):
         self.tools = {}
         self.analyzer = IntentAnalyzer()
-        self.memory = []
+        self.db_path = db_path
+        self.init_db()
+
+    def init_db(self):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS memory (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                user_message TEXT,
+                tool_used TEXT,
+                response_text TEXT
+            )
+        ''')
+        conn.commit()
+        conn.close()
+
+    def save_to_db(self, user_message, tool_used, response_text):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO memory (timestamp, user_message, tool_used, response_text)
+            VALUES (?, ?, ?, ?)
+        ''', (datetime.now().isoformat(), user_message, tool_used, response_text))
+        conn.commit()
+        conn.close()
 
     def register_tool(self, name, function_ref, description):
         self.tools[name] = {"function": function_ref, "description": description}
@@ -121,7 +148,7 @@ class Agentorchestrator:
         return "Tool execution was successful."
 
     def process_request(self, message: str):
-        analysis = self.analyzer.analyze(message, history=self.memory)
+        analysis = self.analyzer.analyze(message)
         if not analysis["tool"]:
             return {"status": "idle", "message": "I could not find a tool matching your request."}
             
@@ -131,6 +158,8 @@ class Agentorchestrator:
             response_text = self.generate_response(execution_result["tool"], execution_result["result"])
             execution_result["response_text"] = response_text
             
-        self.memory.append({"user": message, "response": execution_result})
+            # Save the transaction in the persistent database
+            self.save_to_db(message, execution_result["tool"], response_text)
+            
         return execution_result
-                            
+    
