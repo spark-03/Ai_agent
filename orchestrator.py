@@ -6,14 +6,16 @@ from twilio.rest import Client
 
 class AgentOrchestrator:
     def __init__(self, gemini_api_key, **kwargs):
-        """Initializes the local memory engine, Gemini AI, and Twilio client.
-        Accepts **kwargs to prevent unexpected argument errors."""
+        """Initializes the local memory engine, Gemini AI, and Twilio client."""
         self.data_folder = "agent_data"
         self.memory_file = os.path.join(self.data_folder, "memory.json")
         
         # Initialize Gemini API Client
-        self.gemini_client = genai.Client(api_key=gemini_api_key)
-        
+        if gemini_api_key:
+            self.gemini_client = genai.Client(api_key=gemini_api_key)
+        else:
+            self.gemini_client = None
+            
         # Safely extract Twilio credentials from kwargs
         self.twilio_sid = kwargs.get("twilio_sid")
         self.twilio_token = kwargs.get("twilio_token")
@@ -142,13 +144,16 @@ class AgentOrchestrator:
 
         # Intent 4: General Query Intent (Gemini Fallback)
         else:
+            if not self.gemini_client:
+                return "🤖 **Orchestrator Error:** Gemini Client is not initialized. Check your API key in Streamlit secrets."
+            
             try:
                 chat_response = self.gemini_client.models.generate_content(
                     model="gemini-2.5-flash",
                     contents=f"You are a personal AI Agent. Keep responses concise. User input: {user_input}"
                 )
                 response = chat_response.text
-            except Exception:
-                response = f"🤖 **Orchestrator (Fallback):** You said: {user_input}"
+            except Exception as e:
+                response = f"🤖 **Gemini API Error:** {str(e)}"
 
         return response
