@@ -2,6 +2,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import json
 import os
+import urllib.request
 
 def get_indian_datetime():
     ist_tz = ZoneInfo("Asia/Kolkata")
@@ -27,12 +28,36 @@ def get_stock_price(ticker: str):
         return {"status": "success", "ticker": normalized, "data": market_data[normalized]}
     return {"status": "error", "message": f"Ticker '{ticker}' not found."}
 
+def get_live_weather(city: str = "Nellore"):
+    """
+    Fetches live weather data using a free public API (wttr.in).
+    """
+    try:
+        url = f"https://wttr.in/{urllib.parse.quote(city)}?format=j1"
+        req = urllib.request.Request(
+            url, 
+            headers={'User-Agent': 'Mozilla/5.0'}
+        )
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            current = data['current_condition'][0]
+            return {
+                "status": "success",
+                "city": city.capitalize(),
+                "temp_C": current['temp_C'],
+                "feels_like_C": current['FeelsLikeC'],
+                "condition": current['weatherDesc'][0]['value']
+            }
+    except Exception as e:
+        return {"status": "error", "message": f"Could not retrieve weather data: {str(e)}"}
+
 
 class IntentAnalyzer:
     def __init__(self):
         self.intent_map = {
             "time": {"tool": "get_indian_datetime", "keywords": ["time", "date", "clock", "ist"]},
-            "stock": {"tool": "get_stock_price", "keywords": ["price", "stock", "share", "market", "tcs", "reliance", "infy"]}
+            "stock": {"tool": "get_stock_price", "keywords": ["price", "stock", "share", "market", "tcs", "reliance", "infy"]},
+            "weather": {"tool": "get_live_weather", "keywords": ["weather", "temperature", "forecast", "rain"]}
         }
 
     def analyze(self, prompt: str, history=None):
@@ -42,6 +67,7 @@ class IntentAnalyzer:
                 if kw in prompt_lower:
                     tool = data["tool"]
                     args = {}
+                    
                     if tool == "get_stock_price":
                         if "tcs" in prompt_lower: 
                             args["ticker"] = "TCS"
@@ -51,7 +77,20 @@ class IntentAnalyzer:
                             args["ticker"] = "INFY"
                         else:
                             args["ticker"] = "TCS"
+                            
+                    elif tool == "get_live_weather":
+                        # Attempt to extract location name (e.g., city name following 'in' or 'of')
+                        target_city = "Nellore" # Fallback location
+                        if "in " in prompt_lower:
+                            parts = prompt_lower.split("in ")
+                            target_city = parts[1].split()[0]
+                        elif "of " in prompt_lower:
+                            parts = prompt_lower.split("of ")
+                            target_city = parts[1].split()[0]
+                        args["city"] = target_city
+                        
                     return {"intent_matched": intent_name, "tool": tool, "arguments": args}
+                    
         return {"intent_matched": None, "tool": None, "arguments": None}
 
 
@@ -71,12 +110,15 @@ class AgentOrchestrator:
         return {"status": "success", "tool": tool_name, "result": tool["function"]()}
 
     def generate_response(self, tool_name, result):
-        """Generates a natural language response based on the tool execution result."""
         if tool_name == "get_indian_datetime":
             return f"It is currently {result['time']} on {result['date']} in India (IST)."
         elif tool_name == "get_stock_price":
             data = result['data']
             return f"The current price for {result['ticker']} is ₹{data['price']} with a change of {data['change']}."
+        elif tool_name == "get_live_weather":
+            if result.get("status") == "success":
+                return f"The current weather in {result['city']} is {result['condition']} with a temperature of {result['temp_C']}°C (feels like {result['feels_like_C']}°C)."
+            return f"Error: {result['message']}"
         return "Tool execution was successful."
 
     def process_request(self, message: str):
@@ -92,4 +134,3 @@ class AgentOrchestrator:
             
         self.memory.append({"user": message, "response": execution_result})
         return execution_result
-        
