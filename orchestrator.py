@@ -93,7 +93,7 @@ class IntentAnalyzer:
         return {"intent_matched": None, "tool": None, "arguments": None}
 
 
-class AgentOrchestrator:
+class Agentorchestrator:
     def __init__(self):
         self.tools = {}
         self.analyzer = IntentAnalyzer()
