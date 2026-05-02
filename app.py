@@ -3,7 +3,7 @@ import os
 import sys
 import json
 
-# Add the project directory to the system path to ensure imports work
+# Ensure the module path includes the directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from orchestrator import AgentOrchestrator, get_indian_datetime, get_stock_price
@@ -22,23 +22,23 @@ def get_or_create_orchestrator():
 
 agent = get_or_create_orchestrator()
 
-# Initialize or retrieve chat history
+# Initialize the chat session state if it does not exist
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display previous chat messages
+# Display the conversation
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Accept user input
-if prompt := st.chat_input("What would you like to do? (e.g., What is the stock price of TCS?)"):
-    # 1. Display and store user message
+# User chat input
+if prompt := st.chat_input("What would you like to do? (e.g., What is the stock price of Reliance?)"):
+    # Render user message
     with st.chat_message("user"):
         st.markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
     
-    # 2. Generate agent response using the orchestrator
+    # Process using the stateful orchestrator
     with st.spinner("Processing request..."):
         result = agent.process_request(prompt)
         
@@ -50,8 +50,9 @@ if prompt := st.chat_input("What would you like to do? (e.g., What is the stock 
         else:
             response = f"**Error:** {result['message']}"
             
-    # 3. Display and store assistant response
+    # Render and store assistant response
     with st.chat_message("assistant"):
         st.markdown(response)
+    
     st.session_state.messages.append({"role": "assistant", "content": response})
     
