@@ -6,3 +6,5 @@ twilio
 streamlit-geolocation
 pyotp
 smartapi-python
+pandas
+logzero
