@@ -1,20 +1,36 @@
 import os
 import json
 from datetime import datetime
-from google import genai
 from twilio.rest import Client
 
 class AgentOrchestrator:
     def __init__(self, gemini_api_key, **kwargs):
-        """Initializes the local memory engine, Gemini AI, and Twilio client."""
+        """Initializes the local memory engine, Twilio client, and checks both Gemini SDKs."""
         self.data_folder = "agent_data"
         self.memory_file = os.path.join(self.data_folder, "memory.json")
         
-        # Initialize Gemini API Client
-        if gemini_api_key:
-            self.gemini_client = genai.Client(api_key=gemini_api_key)
-        else:
-            self.gemini_client = None
+        # Initialize Gemini API Client Dynamically
+        self.gemini_client = None
+        self.gemini_model = None
+        self.sdk_type = None
+        
+        if gemini_api_key and gemini_api_key.strip() != "":
+            # 1. Attempt initialization using the new google-genai SDK
+            try:
+                from google import genai
+                self.gemini_client = genai.Client(api_key=gemini_api_key)
+                self.sdk_type = "new"
+            except Exception:
+                # 2. Fallback to the older google-generativeai SDK
+                try:
+                    import google.generativeai as genai
+                    genai.configure(api_key=gemini_api_key)
+                    self.gemini_model = genai.GenerativeModel("gemini-2.5-flash")
+                    self.sdk_type = "old"
+                except Exception as e:
+                    print(f"Gemini Init Error: {e}")
+                    self.gemini_client = None
+                    self.gemini_model = None
             
         # Safely extract Twilio credentials from kwargs
         self.twilio_sid = kwargs.get("twilio_sid")
@@ -47,7 +63,7 @@ class AgentOrchestrator:
             return {}
 
     def _save_data(self, data):
-        """Helper to write data to the JSON file."""
+        """Helper to write data to the local JSON file."""
         with open(self.memory_file, "w") as f:
             json.dump(data, f, indent=4)
 
@@ -97,7 +113,7 @@ class AgentOrchestrator:
         user_input_lower = user_input.lower()
         response = ""
 
-        # Intent 1: Send WhatsApp Message Intent (Strict Keyword Matching)
+        # Intent 1: Send WhatsApp Message Intent
         whatsapp_prefixes = ["send to my whatsapp number", "send me a message", "send a message"]
         matched_prefix = None
         
@@ -142,16 +158,22 @@ class AgentOrchestrator:
             else:
                 response = f"❌ I could not find anything about `{key}` in your local memory."
 
-        # Intent 4: General Query Intent (Gemini Fallback)
+        # Intent 4: General Query Intent (Gemini AI)
         else:
-            if not self.gemini_client:
-                return "🤖 **Orchestrator Error:** Gemini Client is not initialized. Check your API key in Streamlit secrets."
+            if not self.gemini_client and not self.gemini_model:
+                return "🤖 **Orchestrator Error:** Gemini Client is not initialized. Check your `GEMINI_API_KEY`."
             
             try:
-                chat_response = self.gemini_client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=f"You are a personal AI Agent. Keep responses concise. User input: {user_input}"
-                )
+                if self.sdk_type == "new":
+                    chat_response = self.gemini_client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=f"You are a personal AI Agent. Keep responses concise. User input: {user_input}"
+                    )
+                else:
+                    chat_response = self.gemini_model.generate_content(
+                        f"You are a personal AI Agent. Keep responses concise. User input: {user_input}"
+                    )
+                
                 response = chat_response.text
             except Exception as e:
                 response = f"🤖 **Gemini API Error:** {str(e)}"
