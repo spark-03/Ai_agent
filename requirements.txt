@@ -9,3 +9,5 @@ smartapi-python
 pandas
 logzero
 websocket-client
+google-generativeai
+python-dotenv
