@@ -1,54 +1,31 @@
 import streamlit as st
-from orchestrator import AgentOrchestrator
+from orchestrator import Orchestrator
 
-# 1. Page Configuration
-st.set_page_config(page_title="Personal AI Agent", page_icon="🤖", layout="wide")
-st.title("🤖 Personal AI Agent - Free Local Orchestrator")
+st.set_page_config(page_title="AI Orchestrator", page_icon="🤖")
 
-# 2. Retrieve all keys automatically from Streamlit Secrets
-@st.cache_resource
-def init_agent():
-    try:
-        # Get Gemini API key
-        api_key = st.secrets.get("GEMINI_API_KEY", st.secrets.get("gemini_api_key", ""))
-        
-        # Get Twilio credentials
-        twilio_sid = st.secrets.get("TWILIO_ACCOUNT_SID", "")
-        twilio_token = st.secrets.get("TWILIO_AUTH_TOKEN", "")
-        twilio_from = st.secrets.get("TWILIO_WHATSAPP_FROM", "")
-        twilio_to = st.secrets.get("TWILIO_WHATSAPP_TO", "")
-        
-        return AgentOrchestrator(
-            gemini_api_key=api_key,
-            twilio_sid=twilio_sid,
-            twilio_token=twilio_token,
-            twilio_from=twilio_from,
-            twilio_to=twilio_to
-        )
-    except Exception as e:
-        st.error(f"⚠️ Error initializing agent. Details: {e}")
-        return None
+st.title("🤖 Personal AI Orchestrator Agent")
+st.write("Built on Streamlit & Gemini - 100% Free Tier")
 
-agent = init_agent()
+# Initialize orchestrator
+orchestrator = Orchestrator()
 
-if agent:
-    # 3. Initialize Message History
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+# User input field
+user_input = st.text_input("What is your task or question today?")
 
-    # Display Chat History
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.write(msg["content"])
-
-    # 4. Process User Input
-    if user_input := st.chat_input("Enter your command, question, or fact to remember:"):
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        with st.chat_message("user"):
-            st.write(user_input)
-
-        response = agent.route_query(user_input)
-
-        st.session_state.messages.append({"role": "assistant", "content": response})
-        with st.chat_message("assistant"):
-            st.write(response)
+if st.button("Execute"):
+    if user_input:
+        with st.spinner("Orchestrating..."):
+            # 1. Determine Intent
+            intent = orchestrator.determine_intent(user_input)
+            
+            # 2. Generate Result
+            result = orchestrator.route_task(intent, user_input)
+            
+            # Display results
+            st.success("Task completed successfully!")
+            st.info(f"**Detected Intent:** {intent}")
+            
+            st.markdown("### Response:")
+            st.write(result)
+    else:
+        st.warning("Please enter a task or question first.")
