@@ -1,31 +1,20 @@
 import streamlit as st
 from orchestrator import Orchestrator
 
-st.set_page_config(page_title="AI Orchestrator", page_icon="🤖")
+st.set_page_config(page_title="Simple Q&A Agent", page_icon="🤖")
 
-st.title("🤖 Personal AI Orchestrator Agent")
-st.write("Built on Streamlit & Gemini - 100% Free Tier")
+st.title("🤖 Simple Q&A Agent")
+st.write("Built on Streamlit Community Cloud and powered by Gemini.")
 
-# Initialize orchestrator
 orchestrator = Orchestrator()
 
-# User input field
-user_input = st.text_input("What is your task or question today?")
+user_input = st.text_input("Ask a question or give a simple task:")
 
-if st.button("Execute"):
+if st.button("Generate Answer"):
     if user_input:
-        with st.spinner("Orchestrating..."):
-            # 1. Determine Intent
-            intent = orchestrator.determine_intent(user_input)
-            
-            # 2. Generate Result
-            result = orchestrator.route_task(intent, user_input)
-            
-            # Display results
-            st.success("Task completed successfully!")
-            st.info(f"**Detected Intent:** {intent}")
-            
-            st.markdown("### Response:")
+        with st.spinner("Thinking..."):
+            result = orchestrator.answer_question(user_input)
+            st.markdown("### Answer:")
             st.write(result)
     else:
-        st.warning("Please enter a task or question first.")
+        st.warning("Please enter a question first.")
