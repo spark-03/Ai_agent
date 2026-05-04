@@ -18,3 +18,28 @@ ALLOWED_INTENTS = [
     "task_execution",
     "information_lookup"
 ]
+def classify_intent(user_input):
+    prompt = f"""
+You are an AI intent classifier.
+
+Classify the user's input into EXACTLY ONE of these categories:
+- general_qa
+- code_generation
+- task_execution
+- information_lookup
+
+Rules:
+- Return ONLY the category name
+- No explanation
+- No extra words
+
+User input: {user_input}
+"""
+
+    result = call_gemini(prompt).lower().strip()
+
+    # Safety check (VERY IMPORTANT)
+    if result not in ALLOWED_INTENTS:
+        return "general_qa"
+
+    return result
