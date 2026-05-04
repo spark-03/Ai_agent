@@ -65,3 +65,21 @@ Task: {user_input}
 def handle_info(user_input):
     prompt = f"Provide accurate information:\n{user_input}"
     return call_gemini(prompt)
+
+def orchestrator(user_input):
+    intent = classify_intent(user_input)
+
+    if intent == "general_qa":
+        return handle_general_qa(user_input)
+
+    elif intent == "code_generation":
+        return handle_code(user_input)
+
+    elif intent == "task_execution":
+        return handle_task(user_input)
+
+    elif intent == "information_lookup":
+        return handle_info(user_input)
+
+    else:
+        return "Something went wrong."
