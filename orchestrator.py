@@ -66,7 +66,7 @@ def handle_info(user_input):
     prompt = f"Provide accurate information:\n{user_input}"
     return call_gemini(prompt)
 
-def orchestrator(user_input):
+def 0rchestrator(user_input):
     intent = classify_intent(user_input)
 
     if intent == "general_qa":
