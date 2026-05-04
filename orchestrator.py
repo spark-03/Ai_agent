@@ -5,3 +5,10 @@ import streamlit as st
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 model = genai.GenerativeModel("gemini-1.5-flash")
+
+def call_gemini(prompt):
+    try:
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        return f"ERROR: {str(e)}"
