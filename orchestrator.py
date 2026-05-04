@@ -43,3 +43,25 @@ User input: {user_input}
         return "general_qa"
 
     return result
+
+def handle_general_qa(user_input):
+    return call_gemini(user_input)
+
+
+def handle_code(user_input):
+    prompt = f"Write clean and correct code for:\n{user_input}"
+    return call_gemini(prompt)
+
+
+def handle_task(user_input):
+    prompt = f"""
+Break this task into steps and solve it clearly:
+
+Task: {user_input}
+"""
+    return call_gemini(prompt)
+
+
+def handle_info(user_input):
+    prompt = f"Provide accurate information:\n{user_input}"
+    return call_gemini(prompt)
