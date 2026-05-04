@@ -12,3 +12,9 @@ def call_gemini(prompt):
         return response.text.strip()
     except Exception as e:
         return f"ERROR: {str(e)}"
+ALLOWED_INTENTS = [
+    "general_qa",
+    "code_generation",
+    "task_execution",
+    "information_lookup"
+]
