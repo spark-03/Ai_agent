@@ -1,72 +1,140 @@
-import google.generativeai as genai
+from google import genai
 import streamlit as st
+import json
 
-# Configure Gemini
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+# ==============================
+# CONFIGURATION
+# ==============================
 
-model = genai.GenerativeModel("gemini-2.5")
+# Initialize client safely
+try:
+    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+except Exception as e:
+    raise Exception(f"API KEY ERROR: {str(e)}")
 
-def call_gemini(prompt):
-    try:
-        response = model.generate_content(prompt)
-        return response.text.strip()
-    except Exception as e:
-        return f"ERROR: {str(e)}"
+# Use a stable model (no guessing)
+MODEL_NAME = "gemini-2.0-flash"
+
+# Allowed intents (strict control)
 ALLOWED_INTENTS = [
     "general_qa",
     "code_generation",
     "task_execution",
     "information_lookup"
 ]
+
+
+# ==============================
+# SAFE GEMINI CALL
+# ==============================
+
+def call_gemini(prompt):
+    try:
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt
+        )
+
+        if not response or not response.text:
+            return "ERROR: Empty response from model"
+
+        return response.text.strip()
+
+    except Exception as e:
+        return f"ERROR: {str(e)}"
+
+
+# ==============================
+# INTENT CLASSIFIER (STRUCTURED)
+# ==============================
+
 def classify_intent(user_input):
     prompt = f"""
 You are an AI intent classifier.
 
-Classify the user's input into EXACTLY ONE of these categories:
+Return ONLY valid JSON:
+{{"intent": "<one_of_allowed_intents>"}}
+
+Allowed intents:
 - general_qa
 - code_generation
 - task_execution
 - information_lookup
 
 Rules:
-- Return ONLY the category name
 - No explanation
-- No extra words
+- No extra text
+- Only JSON
 
 User input: {user_input}
 """
 
-    result = call_gemini(prompt).lower().strip()
+    result = call_gemini(prompt)
 
-    # Safety check (VERY IMPORTANT)
-    if result not in ALLOWED_INTENTS:
+    # Safe parsing
+    try:
+        data = json.loads(result)
+        intent = data.get("intent", "").strip()
+
+        if intent in ALLOWED_INTENTS:
+            return intent
+        else:
+            return "general_qa"
+
+    except Exception:
         return "general_qa"
 
-    return result
+
+# ==============================
+# HANDLERS
+# ==============================
 
 def handle_general_qa(user_input):
     return call_gemini(user_input)
 
 
 def handle_code(user_input):
-    prompt = f"Write clean and correct code for:\n{user_input}"
+    prompt = f"""
+Write clean, correct, and efficient code.
+
+Task:
+{user_input}
+
+Rules:
+- Provide only code
+- No explanation unless necessary
+"""
     return call_gemini(prompt)
 
 
 def handle_task(user_input):
     prompt = f"""
-Break this task into steps and solve it clearly:
+Break this task into clear steps and solve it.
 
-Task: {user_input}
+Task:
+{user_input}
 """
     return call_gemini(prompt)
 
 
 def handle_info(user_input):
-    prompt = f"Provide accurate information:\n{user_input}"
+    prompt = f"""
+Provide accurate and factual information.
+
+Query:
+{user_input}
+"""
     return call_gemini(prompt)
 
+
+# ==============================
+# MAIN ORCHESTRATOR
+# ==============================
+
 def orchestrator(user_input):
+    if not user_input or not user_input.strip():
+        return "Please enter a valid input."
+
     intent = classify_intent(user_input)
 
     if intent == "general_qa":
@@ -82,4 +150,4 @@ def orchestrator(user_input):
         return handle_info(user_input)
 
     else:
-        return "Something went wrong."
+        return "ERROR: Unknown intent"
